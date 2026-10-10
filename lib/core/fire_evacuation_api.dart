@@ -14,7 +14,7 @@ class FireEvacuationApi {
 
   static const defaultBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://anvesha-project-2026-five.vercel.app',
+    defaultValue: 'https://fireevacuationsystem.vercel.app/',
   );
 
   static String _cleanBaseUrl(String value) {

@@ -25,7 +25,7 @@ def is_configured() -> bool:
         os.environ.get("SUPABASE_URL")
         and (
             os.environ.get("SUPABASE_SECRET_KEY")
-            or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+            or os.environ.get("SUPABASE_PUBLISHABLE_KEY")
         )
     )
 
@@ -33,12 +33,12 @@ def is_configured() -> bool:
 @lru_cache(maxsize=1)
 def get_client() -> Client:
     url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_SECRET_KEY") or os.environ.get(
-        "SUPABASE_SERVICE_ROLE_KEY"
+    key = os.environ.get("SUPABASE_PUBLISHABLE_KEY") or os.environ.get(
+        "SUPABASE_PUBLISHABLE_KEY"
     )
     if not url or not key:
         raise RuntimeError(
-            "Set SUPABASE_URL and SUPABASE_SECRET_KEY "
+            "Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY "
             "(or SUPABASE_SERVICE_ROLE_KEY) for the backend."
         )
     return create_client(url, key)

@@ -9,18 +9,18 @@ void main() {
   test('default API URL uses the deployed FastAPI backend origin', () {
     final uri = Uri.parse(FireEvacuationApi.defaultBaseUrl);
 
-    expect(uri.origin, 'https://anvesha-project-2026-five.vercel.app');
-    expect(uri.host, 'anvesha-project-2026-five.vercel.app');
+    expect(uri.origin, 'https://fireevacuationsystem.vercel.app');
+    expect(uri.host, 'fireevacuationsystem.vercel.app');
     expect(uri.queryParameters.containsKey('_vercel_share'), isFalse);
   });
 
   test('removes Vercel share query when supplied as API_BASE_URL', () {
     final api = FireEvacuationApi(
       baseUrl:
-          'https://anveshaproject.vercel.app/?_vercel_share=hxyMv3iQVm6v0LNCEJYAw4eIPaDgaIQ0',
+          'https://fireevacuationsystem.vercel.app',
     );
 
-    expect(api.baseUrl, 'https://anveshaproject.vercel.app/');
+    expect(api.baseUrl, 'https://fireevacuationsystem.vercel.app/');
   });
 
   test('device ingestion requests send the device token header', () async {
