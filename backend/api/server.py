@@ -111,12 +111,15 @@ async def read_root() -> dict[str, str]:
 @app.get("/status")
 async def read_status() -> dict[str, object]:
     database_configured = db.is_configured()
+    dashboard_configured = db.is_dashboard_configured()
     device_ingestion_configured = bool(os.environ.get("DEVICE_API_TOKEN"))
     return {
         "status": (
             "ok" if database_configured and device_ingestion_configured else "degraded"
         ),
+        "dashboard_configured": dashboard_configured,
         "database_configured": database_configured,
+        "sensor_database_configured": database_configured,
         "device_ingestion_configured": device_ingestion_configured,
     }
 

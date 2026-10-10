@@ -14,6 +14,7 @@ class DashboardOverview extends StatelessWidget {
     required this.apiError,
     required this.apiStatus,
     required this.onRefresh,
+    required this.onAcknowledgeAlert,
   });
 
   final int selectedSection;
@@ -23,6 +24,7 @@ class DashboardOverview extends StatelessWidget {
   final String? apiError;
   final Map<String, dynamic>? apiStatus;
   final VoidCallback onRefresh;
+  final Future<void> Function(String alertId) onAcknowledgeAlert;
 
   static const _sections = [
     ('Command center', 'Safety overview of the school'),
@@ -38,7 +40,10 @@ class DashboardOverview extends StatelessWidget {
     final safeIndex = selectedSection.clamp(0, _sections.length - 1);
     final (title, subtitle) = _sections[safeIndex];
     final databaseConnected = snapshot != null && databaseError == null;
-    final apiConnected = apiStatus?['status'] == 'ok';
+    final apiConnected =
+        apiStatus?['dashboard_configured'] == true ||
+        (apiStatus?['dashboard_configured'] == null &&
+            apiStatus?['status'] == 'ok');
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -118,11 +123,17 @@ class DashboardOverview extends StatelessWidget {
             )
           else
             switch (safeIndex) {
-              0 => _OverviewContent(snapshot: snapshot!),
+              0 => _OverviewContent(
+                snapshot: snapshot!,
+                onAcknowledgeAlert: onAcknowledgeAlert,
+              ),
               1 => _LiveMapContent(snapshot: snapshot!),
               2 => _SensorsContent(snapshot: snapshot!),
               3 => _OccupancyContent(snapshot: snapshot!),
-              4 => _AlertsContent(snapshot: snapshot!),
+              4 => _AlertsContent(
+                snapshot: snapshot!,
+                onAcknowledgeAlert: onAcknowledgeAlert,
+              ),
               _ => _SettingsContent(
                 snapshot: snapshot!,
                 apiConnected: apiConnected,
@@ -136,9 +147,13 @@ class DashboardOverview extends StatelessWidget {
 }
 
 class _OverviewContent extends StatelessWidget {
-  const _OverviewContent({required this.snapshot});
+  const _OverviewContent({
+    required this.snapshot,
+    required this.onAcknowledgeAlert,
+  });
 
   final DashboardSnapshot snapshot;
+  final Future<void> Function(String alertId) onAcknowledgeAlert;
 
   @override
   Widget build(BuildContext context) {
@@ -197,21 +212,27 @@ class _OverviewContent extends StatelessWidget {
             if (constraints.maxWidth < 900) {
               return Column(
                 children: [
-                  CampusMapHazardApp(),
+                  CampusMapHazardApp(snapshot: snapshot),
                   const SizedBox(height: 16),
                   DashboardRouteCard(
                     routes: snapshot.routes,
                     zones: snapshot.zones,
                   ),
                   const SizedBox(height: 16),
-                  _AlertsPanel(alerts: snapshot.alerts),
+                  _AlertsPanel(
+                    alerts: snapshot.alerts,
+                    onAcknowledgeAlert: onAcknowledgeAlert,
+                  ),
                 ],
               );
             }
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(flex: 7, child: CampusMapHazardApp()),
+                Expanded(
+                  flex: 7,
+                  child: CampusMapHazardApp(snapshot: snapshot),
+                ),
                 const SizedBox(width: 16),
                 Expanded(
                   flex: 4,
@@ -222,7 +243,10 @@ class _OverviewContent extends StatelessWidget {
                         zones: snapshot.zones,
                       ),
                       const SizedBox(height: 16),
-                      _AlertsPanel(alerts: snapshot.alerts),
+                      _AlertsPanel(
+                        alerts: snapshot.alerts,
+                        onAcknowledgeAlert: onAcknowledgeAlert,
+                      ),
                     ],
                   ),
                 ),
@@ -243,7 +267,7 @@ class _LiveMapContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
     children: [
-      CampusMapHazardApp(),
+      CampusMapHazardApp(snapshot: snapshot),
       const SizedBox(height: 16),
       DashboardRouteCard(routes: snapshot.routes, zones: snapshot.zones),
     ],
@@ -344,14 +368,21 @@ class _OccupancyContent extends StatelessWidget {
 }
 
 class _AlertsContent extends StatelessWidget {
-  const _AlertsContent({required this.snapshot});
+  const _AlertsContent({
+    required this.snapshot,
+    required this.onAcknowledgeAlert,
+  });
 
   final DashboardSnapshot snapshot;
+  final Future<void> Function(String alertId) onAcknowledgeAlert;
 
   @override
   Widget build(BuildContext context) => Column(
     children: [
-      _AlertsPanel(alerts: snapshot.alerts),
+      _AlertsPanel(
+        alerts: snapshot.alerts,
+        onAcknowledgeAlert: onAcknowledgeAlert,
+      ),
       const SizedBox(height: 16),
       _DataPanel(
         title: 'ACTIVE INCIDENTS',
@@ -419,9 +450,10 @@ class _SettingsContent extends StatelessWidget {
 }
 
 class _AlertsPanel extends StatelessWidget {
-  const _AlertsPanel({required this.alerts});
+  const _AlertsPanel({required this.alerts, required this.onAcknowledgeAlert});
 
   final List<Map<String, dynamic>> alerts;
+  final Future<void> Function(String alertId) onAcknowledgeAlert;
 
   @override
   Widget build(BuildContext context) => _DataPanel(
@@ -439,6 +471,13 @@ class _AlertsPanel extends StatelessWidget {
             ? const Color(0xFFF6C453)
             : const Color(0xFF5CB5F2),
         icon: Icons.notifications_active_outlined,
+        trailing: alert['id'] == null
+            ? null
+            : IconButton(
+                tooltip: 'Acknowledge alert',
+                onPressed: () => onAcknowledgeAlert(alert['id'].toString()),
+                icon: const Icon(Icons.check_circle_outline),
+              ),
       );
     }).toList(),
   );
@@ -489,6 +528,7 @@ class _DataRow extends StatelessWidget {
     required this.icon,
     this.badge,
     this.color,
+    this.trailing,
   });
 
   final String title;
@@ -496,6 +536,7 @@ class _DataRow extends StatelessWidget {
   final IconData icon;
   final String? badge;
   final Color? color;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -541,6 +582,7 @@ class _DataRow extends StatelessWidget {
               ),
             ),
           ],
+          if (trailing != null) ...[const SizedBox(width: 4), trailing!],
         ],
       ),
     );

@@ -49,10 +49,23 @@ class _DashboardState extends State<Dashboard> {
       });
     }
     try {
-      await Future.wait([_loadDashboardData(), _loadApiStatus()]);
+      await _loadApiStatus();
+      await _loadDashboardData();
     } finally {
       _refreshInProgress = false;
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _acknowledgeAlert(String alertId) async {
+    try {
+      await SupabaseService.acknowledgeAlert(alertId);
+      await _refreshData(showLoading: false);
+    } on Exception catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not acknowledge alert: $error')),
+      );
     }
   }
 
@@ -88,7 +101,28 @@ class _DashboardState extends State<Dashboard> {
   Future<void> _loadApiStatus() async {
     try {
       final status = await _api.getStatus();
-      if (mounted) setState(() => _apiStatus = status);
+      final missingSettings = <String>[
+        if (status['dashboard_configured'] == false)
+          'Dashboard reads need SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY '
+              '(or a server key) configured in Vercel.',
+        if (status['sensor_database_configured'] == false ||
+            (status['sensor_database_configured'] == null &&
+                status['database_configured'] == false))
+          'ESP32 readings need a server-only SUPABASE_SECRET_KEY (or '
+              'SUPABASE_SERVICE_ROLE_KEY) in the backend; a publishable key '
+              'cannot write sensor data.',
+        if (status['device_ingestion_configured'] != true)
+          'Set DEVICE_API_TOKEN in the backend.',
+      ];
+      if (mounted) {
+        setState(() {
+          _apiStatus = status;
+          _apiError = missingSettings.isEmpty
+              ? null
+              : 'Backend is reachable, but setup is incomplete. '
+                    '${missingSettings.join(' ')}';
+        });
+      }
     } on DioException catch (error) {
       if (mounted) {
         setState(() => _apiError = _apiErrorMessage(error));
@@ -145,6 +179,10 @@ class _DashboardState extends State<Dashboard> {
                   child: SafeArea(
                     child: DashboardSidebar(
                       selectedIndex: _selectedSection,
+                      isOnline:
+                          _apiStatus?['status'] == 'ok' &&
+                          _databaseError == null,
+                      isChecking: _isLoading && _apiStatus == null,
                       onDestinationSelected: (index) {
                         setState(() => _selectedSection = index);
                         Navigator.of(context).pop();
@@ -158,6 +196,9 @@ class _DashboardState extends State<Dashboard> {
                 if (isWide)
                   DashboardSidebar(
                     selectedIndex: _selectedSection,
+                    isOnline:
+                        _apiStatus?['status'] == 'ok' && _databaseError == null,
+                    isChecking: _isLoading && _apiStatus == null,
                     onDestinationSelected: (index) {
                       setState(() => _selectedSection = index);
                     },
@@ -179,6 +220,7 @@ class _DashboardState extends State<Dashboard> {
                           apiError: _apiError,
                           apiStatus: _apiStatus,
                           onRefresh: _refreshData,
+                          onAcknowledgeAlert: _acknowledgeAlert,
                         ),
                       ),
                     ],

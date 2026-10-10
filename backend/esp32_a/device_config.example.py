@@ -1,4 +1,4 @@
 WIFI_SSID = "REPLACE_WITH_WIFI_NAME"
 WIFI_PASSWORD = "REPLACE_WITH_WIFI_PASSWORD"
-API_URL = "http://192.168.1.10:8000/sensor_readings"
+API_URL = "https://fireevacuationsystem.vercel.app/sensor_readings"
 DEVICE_API_TOKEN = "REPLACE_WITH_DEVICE_API_TOKEN"

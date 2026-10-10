@@ -9,8 +9,8 @@ void main() {
   test('default API URL uses the local FastAPI backend origin', () {
     final uri = Uri.parse(FireEvacuationApi.defaultBaseUrl);
 
-    expect(uri.origin, 'http://127.0.0.1:8000');
-    expect(uri.host, '127.0.0.1');
+    expect(uri.origin, 'https://fireevacuationsystem.vercel.app');
+    expect(uri.host, 'fireevacuationsystem.vercel.app');
     expect(uri.queryParameters.containsKey('_vercel_share'), isFalse);
   });
 

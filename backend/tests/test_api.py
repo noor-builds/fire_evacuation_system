@@ -29,6 +29,7 @@ class SensorApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "ok")
+        self.assertTrue(response.json()["dashboard_configured"])
         self.assertTrue(response.json()["device_ingestion_configured"])
 
     def test_status_is_degraded_without_server_configuration(self) -> None:
@@ -45,8 +46,27 @@ class SensorApiTests(unittest.TestCase):
             response = self.client.get("/status")
 
         self.assertEqual(response.json()["status"], "degraded")
+        self.assertFalse(response.json()["dashboard_configured"])
         self.assertFalse(response.json()["database_configured"])
         self.assertFalse(response.json()["device_ingestion_configured"])
+
+    def test_publishable_key_configures_dashboard_but_not_sensor_writes(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "DEVICE_API_TOKEN": "test-token",
+                "SUPABASE_URL": "https://example.supabase.co",
+                "SUPABASE_SECRET_KEY": "",
+                "SUPABASE_SERVICE_ROLE_KEY": "",
+                "SUPABASE_PUBLISHABLE_KEY": "test-publishable-key",
+            },
+        ):
+            response = self.client.get("/status")
+
+        self.assertTrue(response.json()["dashboard_configured"])
+        self.assertFalse(response.json()["database_configured"])
+        self.assertFalse(response.json()["sensor_database_configured"])
+        self.assertTrue(response.json()["device_ingestion_configured"])
 
     def test_database_client_uses_configured_server_key(self) -> None:
         base_environment = {

@@ -5,6 +5,8 @@ class DashboardSidebar extends StatelessWidget {
   const DashboardSidebar({
     super.key,
     required this.selectedIndex,
+    required this.isOnline,
+    required this.isChecking,
     required this.onDestinationSelected,
   });
 
@@ -18,6 +20,8 @@ class DashboardSidebar extends StatelessWidget {
   ];
 
   final int selectedIndex;
+  final bool isOnline;
+  final bool isChecking;
   final ValueChanged<int> onDestinationSelected;
 
   @override
@@ -60,7 +64,10 @@ class DashboardSidebar extends StatelessWidget {
               onTap: () => onDestinationSelected(index),
             ),
           const Spacer(),
-          const Padding(padding: EdgeInsets.all(20), child: _SystemStatus()),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: _SystemStatus(isOnline: isOnline, isChecking: isChecking),
+          ),
         ],
       ),
     );
@@ -124,11 +131,24 @@ class _NavigationEntry extends StatelessWidget {
 }
 
 class _SystemStatus extends StatelessWidget {
-  const _SystemStatus();
+  const _SystemStatus({required this.isOnline, required this.isChecking});
+
+  final bool isOnline;
+  final bool isChecking;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final statusColor = isChecking
+        ? const Color(0xFFF6C453)
+        : isOnline
+        ? const Color(0xFF55C987)
+        : const Color(0xFFE6A23C);
+    final statusLabel = isChecking
+        ? 'Checking services'
+        : isOnline
+        ? 'System online'
+        : 'Setup required';
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -136,13 +156,13 @@ class _SystemStatus extends StatelessWidget {
         color: colors.onSurface.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.circle, size: 9, color: Color(0xFF55C987)),
-          SizedBox(width: 10),
+          Icon(Icons.circle, size: 9, color: statusColor),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'System online',
+              statusLabel,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 12),

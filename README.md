@@ -91,10 +91,35 @@ https://your-vercel-project.vercel.app/status
 ## 3. Configure the ESP32 boards
 
 In each firmware folder, copy `device_config.example.py` to
-`device_config.py` and set the board's Wi-Fi credentials, the server's LAN
-address in `API_URL`, and the same `DEVICE_API_TOKEN` configured on the server.
+`device_config.py` and set the board's Wi-Fi credentials, the chosen backend
+URL in `API_URL`, and the same `DEVICE_API_TOKEN` configured on the server.
 `device_config.py` is ignored by Git. Flash the matching folder to each board.
-The ESP32s need network access to the computer running FastAPI.
+The ESP32s need a 2.4 GHz Wi-Fi network and network access to the API URL.
+If a real device token was ever saved in a tracked example or committed file,
+replace it in Vercel and on both boards before using the system again.
+
+Choose one API connection:
+
+- **Use the deployed Vercel API:** set `API_URL` in both board config files to
+  `https://fireevacuationsystem.vercel.app/sensor_readings`. The Vercel backend
+  must have `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (or
+  `SUPABASE_SERVICE_ROLE_KEY`), and `DEVICE_API_TOKEN` set. Redeploy after
+  changing Vercel environment variables.
+- **Use a backend running on your computer:** start `python -m backend.main`,
+  find your computer's LAN IPv4 address with `ipconfig`, and set each board's
+  `API_URL` to `http://<computer-LAN-IP>:8000/sensor_readings` (for example,
+  `http://192.168.1.20:8000/sensor_readings`). The computer and ESP32 must be on
+  the same Wi-Fi network, and the firewall must allow inbound TCP port 8000.
+  Set the Flutter `API_BASE_URL` to `http://127.0.0.1:8000` when running
+  Flutter Web on that same computer.
+
+For either option, use the same newly generated random `DEVICE_API_TOKEN` in
+the backend environment and both board config files. Copy the example file to
+`device_config.py` separately in each board folder, then fill in the board's
+Wi-Fi name, password, API URL and token. Never commit `device_config.py` or
+paste a token into source control. The app cannot display readings until a
+signed-in dashboard user can read Supabase data and the backend can write the
+incoming sensor readings.
 
 ### Simple wiring map
 
@@ -117,6 +142,9 @@ Power each sensor according to its module's specification, but make sure its
 output to an ESP32 GPIO stays at or below 3.3 V. GPIO 34 and GPIO 35 are
 input-only and are used only for smoke sensor readings here. Use a transistor
 or driver for a buzzer that needs more current than an ESP32 GPIO can supply.
+The firmware reports ADC counts from 0 to 4095, not calibrated ppm. The
+`SMOKE_THRESHOLD = 1300` value is a starting point; check clean-air readings
+and calibrate it for the exact sensor/module before relying on alarms.
 
 ## 4. Run Flutter
 
@@ -124,8 +152,26 @@ The app uses Supabase Auth for sign-in, then sends the signed-in session's
 access token to `GET /dashboard`. The backend verifies that token with Supabase
 Auth and returns the dashboard snapshot from the same tables that the ESP32
 ingestion API writes. The Flutter app refreshes that snapshot every ten seconds
-and also provides a manual refresh. The Supabase publishable key stays in the
-Flutter app; the server-only Supabase key stays on the backend.
+and also provides a manual refresh. The publishable key can be used for
+authenticated dashboard reads; ESP32 ingestion writes require a server-only
+`SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` on the backend. A
+`SUPABASE_PUBLISHABLE_KEY` alone cannot authorize those writes.
+
+The data path is: smoke sensors and (on ESP 32 A) the DHT22 send readings to
+`POST /sensor_readings`; the backend checks `X-Device-Token` and writes rows to
+`devices`, `sensors`, `sensor_readings`, `zone_risk`, `incidents`, `alerts`,
+and `system_events` in Supabase. The dashboard loads those rows from
+`GET /dashboard` using the signed-in user's Supabase session. Keep the SQL
+schema's BLOCK A through BLOCK F and Cafeteria zones installed; the backend
+uses those exact names.
+
+The campus map reads high/critical zone risk and active incidents from this live
+dashboard snapshot. Sensor readings update the risk and automatically create or
+resolve incidents; the map has no manual declare/clear control. Acknowledging an
+alert only marks that notification as seen and does not mark an active fire safe.
+Only database zones explicitly matched to a position on the schematic are colored
+on the map. Other active zones are listed above the map as unmapped sensor alerts
+so they are visible without being assigned an unverified location.
 
 ```powershell
 flutter run `

@@ -78,10 +78,23 @@ class DashboardSnapshot {
     (total, zone) => total + ((zone['capacity'] as num?)?.toInt() ?? 0),
   );
 
-  int get dangerZoneCount => zoneRisks.where((risk) {
-    final level = risk['risk_level'];
-    return level == 'high' || level == 'critical';
-  }).length;
+  Set<String> get activeDangerZoneIds {
+    return {
+      for (final risk in zoneRisks)
+        if (_isHighRisk(risk['risk_level']) && risk['zone_id'] != null)
+          risk['zone_id'].toString(),
+      for (final incident in incidents)
+        if (incident['status'] == 'active' && incident['zone_id'] != null)
+          incident['zone_id'].toString(),
+    };
+  }
+
+  int get dangerZoneCount => activeDangerZoneIds.length;
+
+  static bool _isHighRisk(Object? level) {
+    final normalized = level?.toString().toLowerCase();
+    return normalized == 'high' || normalized == 'critical';
+  }
 
   int get availableExits => zones.where((zone) {
     if (zone['zone_type'] != 'exit' || zone['is_active'] == false) {

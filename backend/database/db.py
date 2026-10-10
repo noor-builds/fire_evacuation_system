@@ -31,6 +31,13 @@ def is_configured() -> bool:
     return bool(os.environ.get("SUPABASE_URL") and _server_key())
 
 
+def is_dashboard_configured() -> bool:
+    return bool(
+        os.environ.get("SUPABASE_URL")
+        and (_server_key() or os.environ.get("SUPABASE_PUBLISHABLE_KEY"))
+    )
+
+
 def _create_client(*, allow_publishable_key: bool = False) -> Client:
     url = os.environ.get("SUPABASE_URL")
     key = _server_key()
@@ -297,14 +304,14 @@ def persist_sensor_report(
             zone_id,
             "smoke",
             f"Smoke sensor {zone_name}",
-            "ppm",
+            "ADC count",
         )
         client.table("sensor_readings").insert(
             {
                 "sensor_id": sensor_id,
                 "zone_id": zone_id,
                 "value": value,
-                "unit": "ppm",
+                "unit": "ADC count",
             }
         ).execute()
         recorded += 1
@@ -313,7 +320,7 @@ def persist_sensor_report(
         _update_zone_risk(zone_id, smoke_score=score)
         active = value > SMOKE_THRESHOLD
         severity = "critical" if value >= SMOKE_THRESHOLD * 2 else "high"
-        description = f"Smoke reading in {zone_name}: {value:g} ppm."
+        description = f"Smoke sensor reading in {zone_name}: {value:g} ADC count."
         if _record_or_resolve_incident(
             zone_id=zone_id,
             incident_type="smoke",
