@@ -12,7 +12,8 @@ through `BLOCK F`) and the `Cafeteria` temperature zone.
 
 If the original tables are already installed, run
 [`backend/database/seed_esp32_zones.sql`](backend/database/seed_esp32_zones.sql)
-once instead; it adds the required zones and authenticated RLS policies.
+once instead; it adds the required zones and authenticated RLS policies, and
+renames the legacy `users."class incharge"` column if present.
 
 The SQL schema expects Supabase Auth for sign-in. Create operator accounts in
 Supabase Auth. An optional profile row in `public.users` must use the same UUID
@@ -31,7 +32,9 @@ HOST=0.0.0.0
 PORT=8000
 ```
 
-Use a Supabase secret/service-role key only on the server. Never put it in
+Use a Supabase secret key or service-role key only on the server. The public
+publishable key is not a replacement: the backend needs server permissions to
+write the sensor data allowed by the SQL schema. Never put the server key in
 Flutter or ESP32 firmware. From the repository root, install the backend
 dependencies and start the API:
 
@@ -66,9 +69,20 @@ readings for an already-active incident do not create duplicate alerts.
 For Vercel, deploy the repository root. The root [`app.py`](app.py) re-exports
 the FastAPI app from `backend/api/server.py`, and the root
 [`pyproject.toml`](pyproject.toml) lists the server dependencies and Vercel app
-script. Set `SUPABASE_URL`, `SUPABASE_SECRET_KEY` or
-`SUPABASE_SERVICE_ROLE_KEY`, `DEVICE_API_TOKEN`, and optionally
-`CORS_ORIGINS` in the Vercel project environment, then verify:
+script. In the Vercel project settings, add these Environment Variables for
+Production (and Preview if you use preview deployments):
+
+```text
+SUPABASE_URL
+SUPABASE_SECRET_KEY   (or SUPABASE_SERVICE_ROLE_KEY)
+DEVICE_API_TOKEN
+CORS_ORIGINS          (optional; comma-separated deployed frontend origins)
+```
+
+Set `CORS_ORIGINS` to the exact deployed frontend origin, for example
+`https://your-dashboard.vercel.app` (no path or trailing slash). Localhost and
+127.0.0.1 development origins are accepted on any port. Redeploy after changing
+environment variables, then verify:
 
 ```text
 https://your-vercel-project.vercel.app/status
@@ -81,6 +95,28 @@ In each firmware folder, copy `device_config.example.py` to
 address in `API_URL`, and the same `DEVICE_API_TOKEN` configured on the server.
 `device_config.py` is ignored by Git. Flash the matching folder to each board.
 The ESP32s need network access to the computer running FastAPI.
+
+### Simple wiring map
+
+The pin numbers below are the **GPIO numbers printed on the ESP32 board**, not
+the physical pin position along the board edge. Connect every sensor ground to
+ESP32 GND. ESP32 GPIO inputs must never receive more than 3.3 V.
+
+| Board | Part | Connect its signal/output pin to |
+| --- | --- | --- |
+| ESP 32 A | Smoke sensor for BLOCK A | GPIO 32 (analog output/AO) |
+| ESP 32 A | Smoke sensor for BLOCK B | GPIO 33 (analog output/AO) |
+| ESP 32 A | Smoke sensor for BLOCK C | GPIO 34 (analog output/AO) |
+| ESP 32 A | Smoke sensor for BLOCK D | GPIO 35 (analog output/AO) |
+| ESP 32 A | DHT22 temperature data | GPIO 23 |
+| ESP 32 A or B | Buzzer control signal | GPIO 25 |
+| ESP 32 B | Smoke sensor for BLOCK E | GPIO 32 (analog output/AO) |
+| ESP 32 B | Smoke sensor for BLOCK F | GPIO 33 (analog output/AO) |
+
+Power each sensor according to its module's specification, but make sure its
+output to an ESP32 GPIO stays at or below 3.3 V. GPIO 34 and GPIO 35 are
+input-only and are used only for smoke sensor readings here. Use a transistor
+or driver for a buzzer that needs more current than an ESP32 GPIO can supply.
 
 ## 4. Run Flutter
 

@@ -11,22 +11,25 @@ from device_config import API_URL, DEVICE_API_TOKEN
 DEVICE_UID = "ESP 32 A"
 SMOKE_THRESHOLD = 1300
 TEMPERATURE_THRESHOLD = 55
-PINS = {
+BUZZER_PIN = 25
+TEMPERATURE_SENSOR_PIN = 23
+# GPIO numbers are the labels printed on the ESP32 board.
+SMOKE_SENSOR_PINS = {
     "BLOCK A": 32,
     "BLOCK B": 33,
     "BLOCK C": 34,
     "BLOCK D": 35,
 }
 
-buzzer = Pin(25, Pin.OUT)
+buzzer = Pin(BUZZER_PIN, Pin.OUT)
 buzzer.value(0)
 sensors = {}
-for zone_name, pin_number in PINS.items():
+for zone_name, pin_number in SMOKE_SENSOR_PINS.items():
     sensor = ADC(Pin(pin_number))
     sensor.atten(ADC.ATTN_11DB)
     sensors[zone_name] = sensor
 
-temperature_sensor = dht.DHT22(Pin(23))
+temperature_sensor = dht.DHT22(Pin(TEMPERATURE_SENSOR_PIN))
 
 
 def post_sensor_readings(readings, temperature):

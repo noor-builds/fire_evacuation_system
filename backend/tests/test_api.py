@@ -3,7 +3,9 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from postgrest.exceptions import APIError
 
 from backend.api import server
 
@@ -36,6 +38,8 @@ class SensorApiTests(unittest.TestCase):
                 "DEVICE_API_TOKEN": "",
                 "SUPABASE_URL": "",
                 "SUPABASE_SECRET_KEY": "",
+                "SUPABASE_SERVICE_ROLE_KEY": "",
+                "SUPABASE_PUBLISHABLE_KEY": "",
             },
         ):
             response = self.client.get("/status")
@@ -44,7 +48,7 @@ class SensorApiTests(unittest.TestCase):
         self.assertFalse(response.json()["database_configured"])
         self.assertFalse(response.json()["device_ingestion_configured"])
 
-    def test_database_client_uses_configured_supabase_key(self) -> None:
+    def test_database_client_uses_configured_server_key(self) -> None:
         base_environment = {
             "SUPABASE_URL": "https://example.supabase.co",
             "SUPABASE_SECRET_KEY": "",
@@ -54,7 +58,6 @@ class SensorApiTests(unittest.TestCase):
         for key_name in (
             "SUPABASE_SECRET_KEY",
             "SUPABASE_SERVICE_ROLE_KEY",
-            "SUPABASE_PUBLISHABLE_KEY",
         ):
             with self.subTest(key_name=key_name):
                 environment = {**base_environment, key_name: "test-key"}
@@ -71,6 +74,54 @@ class SensorApiTests(unittest.TestCase):
                         self.assertTrue(server.db.is_configured())
                     finally:
                         server.db.get_client.cache_clear()
+
+    def test_publishable_key_is_not_used_for_server_database_writes(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "SUPABASE_URL": "https://example.supabase.co",
+                "SUPABASE_SECRET_KEY": "",
+                "SUPABASE_SERVICE_ROLE_KEY": "",
+                "SUPABASE_PUBLISHABLE_KEY": "test-publishable-key",
+            },
+        ):
+            server.db.get_client.cache_clear()
+            try:
+                self.assertFalse(server.db.is_configured())
+                with self.assertRaisesRegex(RuntimeError, "SUPABASE_SECRET_KEY"):
+                    server.db.get_client()
+            finally:
+                server.db.get_client.cache_clear()
+
+    def test_local_browser_preflight_allows_any_development_port(self) -> None:
+        app = FastAPI()
+        server._add_cors_middleware(app, ["https://dashboard.example"])
+        client = TestClient(app)
+
+        response = client.options(
+            "/dashboard",
+            headers={
+                "Origin": "http://localhost:61800",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "authorization",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.headers["access-control-allow-origin"],
+            "http://localhost:61800",
+        )
+
+        rejected = client.options(
+            "/dashboard",
+            headers={
+                "Origin": "https://not-allowed.example",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "authorization",
+            },
+        )
+        self.assertEqual(rejected.status_code, 400)
 
     def test_dashboard_requires_a_supabase_bearer_token(self) -> None:
         response = self.client.get("/dashboard")
@@ -144,9 +195,9 @@ class SensorApiTests(unittest.TestCase):
                 return self
 
             def execute(self):
-                return SimpleNamespace(
-                    data=None if self.table == "users" else []
-                )
+                if self.table == "users":
+                    return None
+                return SimpleNamespace(data=[])
 
         class Client:
             def __init__(self) -> None:
@@ -164,15 +215,89 @@ class SensorApiTests(unittest.TestCase):
             os.environ,
             {
                 "SUPABASE_URL": "https://example.supabase.co",
+                "SUPABASE_SECRET_KEY": "",
+                "SUPABASE_SERVICE_ROLE_KEY": "",
+                "SUPABASE_PUBLISHABLE_KEY": "test-publishable-key",
+            },
+        ), patch.object(
+            server.db, "create_client", return_value=client
+        ) as create_client:
+            snapshot = server.db.get_dashboard_snapshot("signed-in-user-token")
+
+        create_client.assert_called_once_with(
+            "https://example.supabase.co", "test-publishable-key"
+        )
+        client.postgrest.auth.assert_called_once_with("signed-in-user-token")
+        client.auth.get_user.assert_called_once_with("signed-in-user-token")
+        self.assertEqual(snapshot["zones"], [])
+        self.assertEqual(snapshot["user_profile"], None)
+
+    def test_dashboard_reads_legacy_class_incharge_column(self) -> None:
+        class Query:
+            def __init__(self, table: str) -> None:
+                self.table = table
+                self.columns = ""
+
+            def select(self, columns: str):
+                self.columns = columns
+                return self
+
+            def eq(self, *_args, **_kwargs):
+                return self
+
+            def order(self, *_args, **_kwargs):
+                return self
+
+            def limit(self, *_args, **_kwargs):
+                return self
+
+            def maybe_single(self):
+                return self
+
+            def execute(self):
+                if self.table == "users":
+                    if '"class incharge"' not in self.columns:
+                        raise APIError(
+                            {
+                                "message": 'column users.class_incharge does not exist',
+                                "code": "42703",
+                            }
+                        )
+                    return SimpleNamespace(
+                        data={
+                            "id": "user-id",
+                            "registered_at": "2026-10-10",
+                            "designated_wing": "A",
+                            "class_incharge": True,
+                            "class": "5A",
+                        }
+                    )
+                return SimpleNamespace(data=[])
+
+        class Client:
+            def __init__(self) -> None:
+                self.postgrest = Mock()
+                self.auth = Mock()
+                self.auth.get_user.return_value = SimpleNamespace(
+                    user=SimpleNamespace(id="user-id")
+                )
+
+            def table(self, name: str) -> Query:
+                return Query(name)
+
+        client = Client()
+        with patch.dict(
+            os.environ,
+            {
+                "SUPABASE_URL": "https://example.supabase.co",
+                "SUPABASE_SECRET_KEY": "",
+                "SUPABASE_SERVICE_ROLE_KEY": "",
                 "SUPABASE_PUBLISHABLE_KEY": "test-publishable-key",
             },
         ), patch.object(server.db, "create_client", return_value=client):
             snapshot = server.db.get_dashboard_snapshot("signed-in-user-token")
 
-        client.postgrest.auth.assert_called_once_with("signed-in-user-token")
-        client.auth.get_user.assert_called_once_with("signed-in-user-token")
-        self.assertEqual(snapshot["zones"], [])
-        self.assertEqual(snapshot["user_profile"], None)
+        self.assertTrue(snapshot["user_profile"]["class_incharge"])
 
     def test_sensor_report_is_persisted_and_returns_summary(self) -> None:
         expected = {

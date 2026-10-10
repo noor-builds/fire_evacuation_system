@@ -1,6 +1,27 @@
 -- Apply this only when the original Aegis Grid schema is already installed.
 -- New installations get these zones from schema.sql.
 
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'users'
+          AND column_name = 'class incharge'
+    ) AND NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'users'
+          AND column_name = 'class_incharge'
+    ) THEN
+        ALTER TABLE public.users
+            RENAME COLUMN "class incharge" TO class_incharge;
+    END IF;
+END
+$$;
+
 INSERT INTO zones (name, zone_type, floor)
 SELECT source.name, source.zone_type, 0
 FROM (VALUES

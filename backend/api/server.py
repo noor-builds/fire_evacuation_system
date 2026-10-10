@@ -13,6 +13,7 @@ from backend.database import db
 ESP32_A = "ESP 32 A"
 ESP32_B = "ESP 32 B"
 DEVICE_ZONES = db.DEVICE_ZONES
+LOCAL_WEB_ORIGIN_REGEX = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
 
 app = FastAPI(
     title="Aegis Grid API",
@@ -25,20 +26,20 @@ cors_origins = [
     for origin in os.environ.get("CORS_ORIGINS", "*").split(",")
     if origin.strip()
 ]
-if "*" not in cors_origins:
-    cors_origins.extend([
-        "http://localhost:51725",
-        "http://127.0.0.1:51725",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ])
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Device-Token"],
-    max_age=600,
-)
+
+
+def _add_cors_middleware(application: FastAPI, allowed_origins: list[str]) -> None:
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_origin_regex=LOCAL_WEB_ORIGIN_REGEX,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Device-Token"],
+        max_age=600,
+    )
+
+
+_add_cors_middleware(app, cors_origins)
 
 
 class SensorReadings(BaseModel):

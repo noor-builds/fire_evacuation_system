@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
+from postgrest.exceptions import APIError
 from supabase import Client, create_client
 
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env")
@@ -20,30 +21,26 @@ DEVICE_ZONES = {
 CAFETERIA_ZONE = "Cafeteria"
 
 
+def _server_key() -> str | None:
+    return os.environ.get("SUPABASE_SECRET_KEY") or os.environ.get(
+        "SUPABASE_SERVICE_ROLE_KEY"
+    )
+
+
 def is_configured() -> bool:
-    return bool(
-        os.environ.get("SUPABASE_URL")
-        and (
-            os.environ.get("SUPABASE_SECRET_KEY")
-            or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-            or os.environ.get("SUPABASE_PUBLISHABLE_KEY")
-        )
-    )
+    return bool(os.environ.get("SUPABASE_URL") and _server_key())
 
 
-def _create_client() -> Client:
+def _create_client(*, allow_publishable_key: bool = False) -> Client:
     url = os.environ.get("SUPABASE_URL")
-    key = (
-        os.environ.get("SUPABASE_SECRET_KEY")
-        or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-        or os.environ.get("SUPABASE_PUBLISHABLE_KEY")
-    )
+    key = _server_key()
+    if not key and allow_publishable_key:
+        key = os.environ.get("SUPABASE_PUBLISHABLE_KEY")
     if not url or not key:
         raise RuntimeError(
             "Set SUPABASE_URL and SUPABASE_SECRET_KEY "
-            "(or SUPABASE_SERVICE_ROLE_KEY or SUPABASE_PUBLISHABLE_KEY) "
-            "for the backend."
-   )
+            "(or SUPABASE_SERVICE_ROLE_KEY) for the backend."
+        )
     return create_client(url, key)
 
 
@@ -427,20 +424,35 @@ def get_occupancy_count(device_uid: str, place: str) -> int:
 
 
 def get_dashboard_snapshot(access_token: str) -> dict[str, Any]:
-    client = _create_client()
+    client = _create_client(allow_publishable_key=True)
     client.postgrest.auth(access_token)
     user = client.auth.get_user(access_token)
     if user is None or user.user is None:
         raise PermissionError("The Supabase access token is invalid or expired.")
 
-    profile = (
+    profile_query = (
         client.table("users")
         .select("id,registered_at,designated_wing,class_incharge,class")
         .eq("id", user.user.id)
         .maybe_single()
-        .execute()
-        .data
     )
+    try:
+        profile_response = profile_query.execute()
+        profile = profile_response.data if profile_response is not None else None
+    except APIError as error:
+        if error.code != "42703":
+            raise
+        profile_response = (
+            client.table("users")
+            .select(
+                'id,registered_at,designated_wing,'
+                'class_incharge:"class incharge",class'
+            )
+            .eq("id", user.user.id)
+            .maybe_single()
+            .execute()
+        )
+        profile = profile_response.data if profile_response is not None else None
     return {
         "zones": client.table("zones").select("*").order("name").execute().data,
         "devices": (

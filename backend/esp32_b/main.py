@@ -9,15 +9,17 @@ from device_config import API_URL, DEVICE_API_TOKEN
 
 DEVICE_UID = "ESP 32 B"
 SMOKE_THRESHOLD = 1300
-PINS = {
+BUZZER_PIN = 25
+# GPIO numbers are the labels printed on the ESP32 board.
+SMOKE_SENSOR_PINS = {
     "BLOCK E": 32,
     "BLOCK F": 33,
 }
 
-buzzer = Pin(25, Pin.OUT)
+buzzer = Pin(BUZZER_PIN, Pin.OUT)
 buzzer.value(0)
 sensors = {}
-for zone_name, pin_number in PINS.items():
+for zone_name, pin_number in SMOKE_SENSOR_PINS.items():
     sensor = ADC(Pin(pin_number))
     sensor.atten(ADC.ATTN_11DB)
     sensors[zone_name] = sensor
