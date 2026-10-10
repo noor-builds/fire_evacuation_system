@@ -6,18 +6,17 @@ import 'package:fire_evacuation_app/core/fire_evacuation_api.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('default API URL uses the deployed FastAPI backend origin', () {
+  test('default API URL uses the local FastAPI backend origin', () {
     final uri = Uri.parse(FireEvacuationApi.defaultBaseUrl);
 
-    expect(uri.origin, 'https://fireevacuationsystem.vercel.app');
-    expect(uri.host, 'fireevacuationsystem.vercel.app');
+    expect(uri.origin, 'http://127.0.0.1:8000');
+    expect(uri.host, '127.0.0.1');
     expect(uri.queryParameters.containsKey('_vercel_share'), isFalse);
   });
 
   test('removes Vercel share query when supplied as API_BASE_URL', () {
     final api = FireEvacuationApi(
-      baseUrl:
-          'https://fireevacuationsystem.vercel.app',
+      baseUrl: 'https://fireevacuationsystem.vercel.app?_vercel_share=token',
     );
 
     expect(api.baseUrl, 'https://fireevacuationsystem.vercel.app/');

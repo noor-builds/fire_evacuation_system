@@ -14,13 +14,17 @@ class FireEvacuationApi {
 
   static const defaultBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://fireevacuationsystem.vercel.app/',
+    defaultValue: 'http://127.0.0.1:8000',
   );
 
   static String _cleanBaseUrl(String value) {
     final trimmed = value.trim();
     final uri = Uri.parse(trimmed);
-    if (!uri.queryParameters.containsKey('_vercel_share')) return trimmed;
+    if (!uri.queryParameters.containsKey('_vercel_share')) {
+      return uri.hasAuthority && uri.path.isEmpty
+          ? uri.replace(path: '/').toString()
+          : trimmed;
+    }
 
     final queryParameters = Map<String, String>.from(uri.queryParameters)
       ..remove('_vercel_share');
@@ -29,7 +33,7 @@ class FireEvacuationApi {
       userInfo: uri.userInfo,
       host: uri.host,
       port: uri.hasPort ? uri.port : null,
-      path: uri.path,
+      path: uri.path.isEmpty ? '/' : uri.path,
       queryParameters: queryParameters.isEmpty ? null : queryParameters,
     ).toString();
   }

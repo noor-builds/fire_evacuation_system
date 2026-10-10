@@ -25,23 +25,31 @@ def is_configured() -> bool:
         os.environ.get("SUPABASE_URL")
         and (
             os.environ.get("SUPABASE_SECRET_KEY")
+            or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
             or os.environ.get("SUPABASE_PUBLISHABLE_KEY")
         )
     )
 
 
-@lru_cache(maxsize=1)
-def get_client() -> Client:
+def _create_client() -> Client:
     url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_PUBLISHABLE_KEY") or os.environ.get(
-        "SUPABASE_PUBLISHABLE_KEY"
+    key = (
+        os.environ.get("SUPABASE_SECRET_KEY")
+        or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        or os.environ.get("SUPABASE_PUBLISHABLE_KEY")
     )
     if not url or not key:
         raise RuntimeError(
-            "Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY "
-            "(or SUPABASE_SERVICE_ROLE_KEY) for the backend."
-        )
+            "Set SUPABASE_URL and SUPABASE_SECRET_KEY "
+            "(or SUPABASE_SERVICE_ROLE_KEY or SUPABASE_PUBLISHABLE_KEY) "
+            "for the backend."
+   )
     return create_client(url, key)
+
+
+@lru_cache(maxsize=1)
+def get_client() -> Client:
+    return _create_client()
 
 
 def _zone_ids(names: set[str]) -> dict[str, str]:
@@ -419,7 +427,8 @@ def get_occupancy_count(device_uid: str, place: str) -> int:
 
 
 def get_dashboard_snapshot(access_token: str) -> dict[str, Any]:
-    client = get_client()
+    client = _create_client()
+    client.postgrest.auth(access_token)
     user = client.auth.get_user(access_token)
     if user is None or user.user is None:
         raise PermissionError("The Supabase access token is invalid or expired.")

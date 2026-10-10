@@ -1,6 +1,7 @@
 import os
 import unittest
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
 
@@ -42,6 +43,34 @@ class SensorApiTests(unittest.TestCase):
         self.assertEqual(response.json()["status"], "degraded")
         self.assertFalse(response.json()["database_configured"])
         self.assertFalse(response.json()["device_ingestion_configured"])
+
+    def test_database_client_uses_configured_supabase_key(self) -> None:
+        base_environment = {
+            "SUPABASE_URL": "https://example.supabase.co",
+            "SUPABASE_SECRET_KEY": "",
+            "SUPABASE_SERVICE_ROLE_KEY": "",
+            "SUPABASE_PUBLISHABLE_KEY": "",
+        }
+        for key_name in (
+            "SUPABASE_SECRET_KEY",
+            "SUPABASE_SERVICE_ROLE_KEY",
+            "SUPABASE_PUBLISHABLE_KEY",
+        ):
+            with self.subTest(key_name=key_name):
+                environment = {**base_environment, key_name: "test-key"}
+                with patch.dict(os.environ, environment):
+                    server.db.get_client.cache_clear()
+                    try:
+                        with patch.object(
+                            server.db, "create_client", return_value=object()
+                        ) as create_client:
+                            server.db.get_client()
+                        create_client.assert_called_once_with(
+                            "https://example.supabase.co", "test-key"
+                        )
+                        self.assertTrue(server.db.is_configured())
+                    finally:
+                        server.db.get_client.cache_clear()
 
     def test_dashboard_requires_a_supabase_bearer_token(self) -> None:
         response = self.client.get("/dashboard")
@@ -93,6 +122,57 @@ class SensorApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), snapshot)
         get_snapshot.assert_called_once_with("supabase-access-token")
+
+    def test_dashboard_database_queries_use_the_signed_in_user_token(self) -> None:
+        class Query:
+            def __init__(self, table: str) -> None:
+                self.table = table
+
+            def select(self, *_args, **_kwargs):
+                return self
+
+            def eq(self, *_args, **_kwargs):
+                return self
+
+            def order(self, *_args, **_kwargs):
+                return self
+
+            def limit(self, *_args, **_kwargs):
+                return self
+
+            def maybe_single(self):
+                return self
+
+            def execute(self):
+                return SimpleNamespace(
+                    data=None if self.table == "users" else []
+                )
+
+        class Client:
+            def __init__(self) -> None:
+                self.postgrest = Mock()
+                self.auth = Mock()
+                self.auth.get_user.return_value = SimpleNamespace(
+                    user=SimpleNamespace(id="user-id")
+                )
+
+            def table(self, name: str) -> Query:
+                return Query(name)
+
+        client = Client()
+        with patch.dict(
+            os.environ,
+            {
+                "SUPABASE_URL": "https://example.supabase.co",
+                "SUPABASE_PUBLISHABLE_KEY": "test-publishable-key",
+            },
+        ), patch.object(server.db, "create_client", return_value=client):
+            snapshot = server.db.get_dashboard_snapshot("signed-in-user-token")
+
+        client.postgrest.auth.assert_called_once_with("signed-in-user-token")
+        client.auth.get_user.assert_called_once_with("signed-in-user-token")
+        self.assertEqual(snapshot["zones"], [])
+        self.assertEqual(snapshot["user_profile"], None)
 
     def test_sensor_report_is_persisted_and_returns_summary(self) -> None:
         expected = {

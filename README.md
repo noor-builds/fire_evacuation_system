@@ -97,18 +97,17 @@ flutter run `
   --dart-define=SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ```
 
-The default API origin is
-`https://anvesha-project-2026-five.vercel.app`; the app appends `/dashboard`
-for dashboard requests. To use a local backend instead, pass
-`--dart-define=API_BASE_URL=http://127.0.0.1:8000`. For the Android emulator,
-use `http://10.0.2.2:8000`; for a physical phone, use the computer's reachable
-LAN address. The API handles browser `OPTIONS` preflight requests for the
+The default API origin is `http://127.0.0.1:8000`; the app appends `/dashboard`
+for dashboard requests. For the Android emulator, set
+`--dart-define=API_BASE_URL=http://10.0.2.2:8000`; for a physical phone, use
+the computer's reachable LAN address. To use a deployed backend, set
+`API_BASE_URL` to its origin. The API handles browser `OPTIONS` preflight requests for the
 `Authorization` header. For a deployed Flutter Web origin, set the backend
 `CORS_ORIGINS` environment variable to its exact origin (scheme and host,
 including port if applicable; multiple origins can be comma-separated), then
 restart/redeploy the backend. Use HTTPS for deployed frontend and backend
-origins. If deploying Flutter Web to a different API origin, override the
-default at build time:
+origins. When deploying Flutter Web, override the local default with the deployed API
+origin at build time:
 
 ```powershell
 flutter build web --release `
