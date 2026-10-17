@@ -349,6 +349,32 @@ class SensorApiTests(unittest.TestCase):
             occupancy={},
         )
 
+    def test_sensor_reports_accept_the_zone_map_used_by_both_boards(self) -> None:
+        reports = (
+            (
+                "ESP 32 A",
+                {
+                    "BLOCK A": 210,
+                    "BLOCK B": 125,
+                    "BLOCK C": 90,
+                    "BLOCK D": 80,
+                },
+            ),
+            ("ESP 32 B", {"BLOCK E": 175, "BLOCK F": 95}),
+        )
+        for device_uid, readings in reports:
+            with self.subTest(device_uid=device_uid), patch.object(
+                server.db, "persist_sensor_report", return_value={"status": "safe"}
+            ) as persist:
+                response = self.client.post(
+                    "/sensor_readings",
+                    headers={"X-Device-Token": "test-token"},
+                    json={"key": device_uid, "readings": readings},
+                )
+
+            self.assertEqual(response.status_code, 200)
+            persist.assert_called_once()
+
     def test_invalid_zone_is_rejected_before_persistence(self) -> None:
         with patch.object(server.db, "persist_sensor_report") as persist:
             response = self.client.post(

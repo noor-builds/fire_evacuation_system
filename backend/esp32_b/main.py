@@ -1,4 +1,5 @@
 import json
+import random
 import time
 
 import urequests
@@ -8,14 +9,13 @@ import boot
 from device_config import API_URL, DEVICE_API_TOKEN
 
 DEVICE_UID = "ESP 32 B"
+NAME = DEVICE_UID
 SMOKE_THRESHOLD = 1300
 BUZZER_PIN = 25
 # GPIO numbers are the labels printed on the ESP32 board.
 SMOKE_SENSOR_PINS = {
-    "BLOCK A": 32,
-    "BLOCK B": 33,
-    "BLOCK C": 26,
-    "BLOCK D": 27,
+    "BLOCK E": 32,
+    "BLOCK F": 33,
 }
 
 buzzer = Pin(BUZZER_PIN, Pin.OUT)
@@ -25,6 +25,34 @@ for zone_name, pin_number in SMOKE_SENSOR_PINS.items():
     sensor = ADC(Pin(pin_number))
     sensor.atten(ADC.ATTN_11DB)
     sensors[zone_name] = sensor
+
+
+def potentialFireMsg(room, smokeVal, key):
+    if key != DEVICE_UID:
+        return None
+    return (
+        "Fire in room: {}, and smoke density: {}".format(room, smokeVal),
+        "Data from: {}".format(NAME),
+        "Starting Buzzer sounds...",
+    )
+
+
+def get_smoke_desnity(room, smokeVal, key):
+    if key != DEVICE_UID:
+        return None
+    return room, smokeVal
+
+
+def get_amount_of_peopleb(key):
+    if key != DEVICE_UID:
+        return None
+    return random.randint(1, 430)
+
+
+def get_amount_of_heads_in_class(key):
+    if key != DEVICE_UID:
+        return None
+    return random.randint(1, 43)
 
 
 def post_sensor_readings(readings):
@@ -46,7 +74,9 @@ def post_sensor_readings(readings):
         response.close()
 
 
-def run_fire_safety_system():
+def run_fire_safety_system(key=DEVICE_UID):
+    if key != DEVICE_UID:
+        raise ValueError("This device only runs as {}".format(DEVICE_UID))
     boot.connect_wifi()
     while True:
         readings = {name: sensor.read() for name, sensor in sensors.items()}
@@ -56,6 +86,14 @@ def run_fire_safety_system():
         buzzer.value(1 if fire_detected else 0)
 
         print("Smoke readings:", readings)
+        if fire_detected:
+            highest_room = max(readings, key=readings.get)
+            alert = potentialFireMsg(
+                highest_room,
+                readings[highest_room],
+                DEVICE_UID,
+            )
+            print("\n".join(alert))
         if boot.connect_wifi():
             try:
                 post_sensor_readings(readings)
