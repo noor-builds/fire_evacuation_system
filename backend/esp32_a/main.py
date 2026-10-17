@@ -15,10 +15,8 @@ BUZZER_PIN = 25
 TEMPERATURE_SENSOR_PIN = 23
 # GPIO numbers are the labels printed on the ESP32 board.
 SMOKE_SENSOR_PINS = {
-    "BLOCK A": 32,
-    "BLOCK B": 33,
-    "BLOCK C": 34,
-    "BLOCK D": 35,
+    "BLOCK E": 32,
+    "BLOCK F": 33,
 }
 
 buzzer = Pin(BUZZER_PIN, Pin.OUT)

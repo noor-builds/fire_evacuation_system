@@ -12,8 +12,10 @@ SMOKE_THRESHOLD = 1300
 BUZZER_PIN = 25
 # GPIO numbers are the labels printed on the ESP32 board.
 SMOKE_SENSOR_PINS = {
-    "BLOCK E": 32,
-    "BLOCK F": 33,
+    "BLOCK A": 32,
+    "BLOCK B": 33,
+    "BLOCK C": 26,
+    "BLOCK D": 27,
 }
 
 buzzer = Pin(BUZZER_PIN, Pin.OUT)
