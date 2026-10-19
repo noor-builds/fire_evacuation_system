@@ -15,6 +15,10 @@ void main() {
       expect(find.text('Welcome back'), findsOneWidget);
       expect(find.text('Sign in'), findsOneWidget);
       expect(find.text('Forgot password?'), findsOneWidget);
+      expect(
+        tester.getSize(find.byType(Card).first).width,
+        lessThanOrEqualTo(size.width - 40),
+      );
       expect(tester.takeException(), isNull);
     });
   }
@@ -136,9 +140,149 @@ void main() {
       ),
     );
 
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.byTooltip('Acknowledge alert'));
     await tester.pump();
     expect(acknowledgedId, 'alert-1');
+  });
+
+  testWidgets('overview shows real readings and no occupancy as unavailable', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DashboardOverview(
+            selectedSection: 0,
+            snapshot: _snapshot(
+              sensorReadings: [
+                {
+                  'zone_id': 'zone-a',
+                  'value': 735,
+                  'unit': 'ADC count',
+                  'recorded_at': '2026-10-10T07:00:00Z',
+                },
+              ],
+            ),
+            isLoading: false,
+            databaseError: null,
+            apiError: null,
+            apiStatus: const {'status': 'ok'},
+            onRefresh: () {},
+            onAcknowledgeAlert: (_) async {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('—'), findsAtLeastNWidgets(1));
+    expect(find.text('No occupancy readings'), findsOneWidget);
+    expect(find.textContaining('BLOCK A · 735 ADC count'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('occupancy lists all six blocks and identifies estimates', (
+    tester,
+  ) async {
+    final zones = List.generate(6, (index) {
+      final block = String.fromCharCode('A'.codeUnitAt(0) + index);
+      return {
+        'id': 'zone-$block',
+        'name': 'BLOCK $block',
+        'zone_type': 'classroom',
+        'capacity': 40,
+      };
+    });
+    final snapshot = DashboardSnapshot(
+      zones: zones,
+      devices: const [],
+      sensors: const [],
+      sensorReadings: const [],
+      occupancyReadings: [
+        {
+          'zone_id': 'zone-A',
+          'person_count': 12,
+          'source': 'estimated',
+          'recorded_at': '2026-10-10T07:00:00Z',
+        },
+      ],
+      zoneRisks: const [],
+      incidents: const [],
+      alerts: const [],
+      routes: const [],
+      userProfile: null,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DashboardOverview(
+            selectedSection: 3,
+            snapshot: snapshot,
+            isLoading: false,
+            databaseError: null,
+            apiError: null,
+            apiStatus: const {'status': 'ok'},
+            onRefresh: () {},
+            onAcknowledgeAlert: (_) async {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+
+    for (final block in ['A', 'B', 'C', 'D', 'E', 'F']) {
+      expect(find.text('BLOCK $block'), findsOneWidget);
+    }
+    expect(
+      find.textContaining('12 children · Random demo estimate'),
+      findsOneWidget,
+    );
+    expect(find.text('No occupancy reading received'), findsNWidgets(5));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('dashboard sections transition when navigation changes', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DashboardOverview(
+            selectedSection: 0,
+            snapshot: _snapshot(),
+            isLoading: false,
+            databaseError: null,
+            apiError: null,
+            apiStatus: const {'status': 'ok'},
+            onRefresh: () {},
+            onAcknowledgeAlert: (_) async {},
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Command center'), findsOneWidget);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DashboardOverview(
+            selectedSection: 1,
+            snapshot: _snapshot(),
+            isLoading: false,
+            databaseError: null,
+            apiError: null,
+            apiStatus: const {'status': 'ok'},
+            onRefresh: () {},
+            onAcknowledgeAlert: (_) async {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Live map'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
 
@@ -146,6 +290,7 @@ DashboardSnapshot _snapshot({
   bool activeBlockA = false,
   bool activeBlockB = false,
   List<Map<String, dynamic>> alerts = const [],
+  List<Map<String, dynamic>> sensorReadings = const [],
 }) {
   final zones = [
     {'id': 'zone-a', 'name': 'BLOCK A'},
@@ -165,7 +310,7 @@ DashboardSnapshot _snapshot({
     zones: zones,
     devices: const [],
     sensors: const [],
-    sensorReadings: const [],
+    sensorReadings: sensorReadings,
     occupancyReadings: const [],
     zoneRisks: zoneRisks,
     incidents: incidents,

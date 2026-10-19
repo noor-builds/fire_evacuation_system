@@ -87,6 +87,25 @@ def require_device_token(
         raise HTTPException(status_code=401, detail="Invalid device token.")
 
 
+def require_user_access_token(
+    authorization: Annotated[str | None, Header()] = None,
+) -> str:
+    if authorization is None or not authorization.lower().startswith("bearer "):
+        raise HTTPException(
+            status_code=401,
+            detail="A Supabase access token is required.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = authorization[7:].strip()
+    if not access_token:
+        raise HTTPException(
+            status_code=401,
+            detail="A Supabase access token is required.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return access_token
+
+
 def _persist_report(payload: SensorReadings) -> dict:
     try:
         return db.persist_sensor_report(
@@ -125,9 +144,21 @@ async def read_status() -> dict[str, object]:
 
 
 @app.get("/student")
-def get_student_count(key: str, place: str) -> int:
+def get_student_count(
+    key: str,
+    place: str,
+    access_token: Annotated[str, Depends(require_user_access_token)],
+) -> int:
     try:
-        return db.get_occupancy_count(key, place)
+        return db.get_occupancy_count(key, place, access_token)
+    except AuthApiError as error:
+        raise HTTPException(
+            status_code=401,
+            detail="The Supabase access token is invalid or expired.",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from error
+    except PermissionError as error:
+        raise HTTPException(status_code=401, detail=str(error)) from error
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     except LookupError as error:
@@ -138,21 +169,8 @@ def get_student_count(key: str, place: str) -> int:
 
 @app.get("/dashboard")
 def get_dashboard(
-    authorization: Annotated[str | None, Header()] = None,
+    access_token: Annotated[str, Depends(require_user_access_token)],
 ) -> dict:
-    if authorization is None or not authorization.lower().startswith("bearer "):
-        raise HTTPException(
-            status_code=401,
-            detail="A Supabase access token is required.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    access_token = authorization[7:].strip()
-    if not access_token:
-        raise HTTPException(
-            status_code=401,
-            detail="A Supabase access token is required.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
     try:
         return db.get_dashboard_snapshot(access_token)
     except AuthApiError as error:

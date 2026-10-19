@@ -157,6 +157,10 @@ authenticated dashboard reads; ESP32 ingestion writes require a server-only
 `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` on the backend. A
 `SUPABASE_PUBLISHABLE_KEY` alone cannot authorize those writes.
 
+The compatibility endpoint `GET /student?key=<device>&place=<class|block>`
+also requires `Authorization: Bearer <Supabase access token>`. Occupancy counts
+are queried with that signed-in user's RLS context, not the server write key.
+
 The data path is: smoke sensors and (on ESP 32 A) the DHT22 send readings to
 `POST /sensor_readings`; the backend checks `X-Device-Token` and writes rows to
 `devices`, `sensors`, `sensor_readings`, `zone_risk`, `incidents`, `alerts`,
@@ -164,6 +168,16 @@ and `system_events` in Supabase. The dashboard loads those rows from
 `GET /dashboard` using the signed-in user's Supabase session. Keep the SQL
 schema's BLOCK A through BLOCK F and Cafeteria zones installed; the backend
 uses those exact names.
+
+The ESP32 firmware reports smoke ADC readings and (on ESP 32 A) cafeteria
+temperature. It does not include a people-count sensor. The schema and existing
+database seed script create one random, explicitly estimated demo count for each
+of BLOCK A through BLOCK F only when that block has no occupancy history. The
+Occupancy view always lists all six blocks and labels those estimates; later
+real occupancy readings will appear as reported. These sample counts are not
+live sensor measurements. The command center shows the latest received sensor
+readings; an empty list means the boards have not successfully posted data to
+this backend yet.
 
 The campus map reads high/critical zone risk and active incidents from this live
 dashboard snapshot. Sensor readings update the risk and automatically create or
@@ -179,8 +193,10 @@ flutter run `
   --dart-define=SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ```
 
-The default API origin is `http://127.0.0.1:8000`; the app appends `/dashboard`
-for dashboard requests. For the Android emulator, set
+The default API origin is `https://fireevacuationsystem.vercel.app`; the app
+appends `/dashboard` for dashboard requests. For local testing, start the
+backend with `python -m backend.main` and set
+`--dart-define=API_BASE_URL=http://127.0.0.1:8000`. For the Android emulator, set
 `--dart-define=API_BASE_URL=http://10.0.2.2:8000`; for a physical phone, use
 the computer's reachable LAN address. To use a deployed backend, set
 `API_BASE_URL` to its origin. The API handles browser `OPTIONS` preflight requests for the
@@ -188,7 +204,7 @@ the computer's reachable LAN address. To use a deployed backend, set
 `CORS_ORIGINS` environment variable to its exact origin (scheme and host,
 including port if applicable; multiple origins can be comma-separated), then
 restart/redeploy the backend. Use HTTPS for deployed frontend and backend
-origins. When deploying Flutter Web, override the local default with the deployed API
+origins. When deploying Flutter Web, set the deployed API
 origin at build time:
 
 ```powershell

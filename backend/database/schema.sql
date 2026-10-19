@@ -265,15 +265,30 @@ INSERT INTO zones (name, zone_type, floor, x, y, capacity) VALUES
     ('Exit A', 'exit', 0, 100, 400, NULL),
     ('Exit B', 'exit', 0, 500, 400, NULL),
     ('Assembly Point A', 'assembly_point', 0, 100, 600, NULL),
-    ('BLOCK A', 'other', 0, NULL, NULL, NULL),
-    ('BLOCK B', 'other', 0, NULL, NULL, NULL),
-    ('BLOCK C', 'other', 0, NULL, NULL, NULL),
-    ('BLOCK D', 'other', 0, NULL, NULL, NULL),
-    ('BLOCK E', 'other', 0, NULL, NULL, NULL),
-    ('BLOCK F', 'other', 0, NULL, NULL, NULL),
+    ('BLOCK A', 'classroom', 0, NULL, NULL, 40),
+    ('BLOCK B', 'classroom', 0, NULL, NULL, 40),
+    ('BLOCK C', 'classroom', 0, NULL, NULL, 40),
+    ('BLOCK D', 'classroom', 0, NULL, NULL, 40),
+    ('BLOCK E', 'classroom', 0, NULL, NULL, 40),
+    ('BLOCK F', 'classroom', 0, NULL, NULL, 40),
     ('Cafeteria', 'cafeteria', 0, NULL, NULL, NULL)
 ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO zone_risk (zone_id)
 SELECT id FROM zones
 ON CONFLICT (zone_id) DO NOTHING;
+
+INSERT INTO occupancy_readings (zone_id, person_count, source)
+SELECT
+    z.id,
+    floor(random() * COALESCE(NULLIF(z.capacity, 0), 40))::integer + 1,
+    'estimated'
+FROM zones AS z
+WHERE z.name IN (
+    'BLOCK A', 'BLOCK B', 'BLOCK C', 'BLOCK D', 'BLOCK E', 'BLOCK F'
+)
+AND NOT EXISTS (
+    SELECT 1
+    FROM occupancy_readings AS readings
+    WHERE readings.zone_id = z.id
+);

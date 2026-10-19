@@ -29,6 +29,25 @@ void main() {
     expect(snapshot.peopleInside, 12);
     expect(snapshot.totalCapacity, 40);
     expect(snapshot.userProfile?['designated_wing'], 'North');
+    expect(snapshot.hasOccupancyReadings, isTrue);
+  });
+
+  test('distinguishes missing occupancy reports from a count of zero', () {
+    final snapshot = DashboardSnapshot.fromJson({
+      'zones': [],
+      'devices': [],
+      'sensors': [],
+      'sensor_readings': [],
+      'occupancy_readings': [],
+      'zone_risks': [],
+      'incidents': [],
+      'alerts': [],
+      'routes': [],
+      'user_profile': null,
+    });
+
+    expect(snapshot.peopleInside, 0);
+    expect(snapshot.hasOccupancyReadings, isFalse);
   });
 
   test('rejects a malformed backend dashboard response', () {

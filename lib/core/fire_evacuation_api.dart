@@ -1,14 +1,16 @@
 import 'package:dio/dio.dart';
 
 class FireEvacuationApi {
+  static const _maxReadAttempts = 3;
+
   FireEvacuationApi({Dio? dio, String? baseUrl})
     : _dio =
           dio ??
           Dio(
             BaseOptions(
               baseUrl: _cleanBaseUrl(baseUrl ?? defaultBaseUrl),
-              connectTimeout: const Duration(seconds: 5),
-              receiveTimeout: const Duration(seconds: 8),
+              connectTimeout: const Duration(seconds: 8),
+              receiveTimeout: const Duration(seconds: 15),
             ),
           );
 
@@ -42,12 +44,12 @@ class FireEvacuationApi {
   String get baseUrl => _dio.options.baseUrl;
 
   Future<Map<String, dynamic>> getStatus() =>
-      _requestMap(_dio.get<Map<String, dynamic>>('/status'));
+      _getWithRetry(() => _dio.get<Map<String, dynamic>>('/status'));
 
   Future<Map<String, dynamic>> getDashboardSnapshot({
     required String accessToken,
-  }) => _requestMap(
-    _dio.get<Map<String, dynamic>>(
+  }) => _getWithRetry(
+    () => _dio.get<Map<String, dynamic>>(
       '/dashboard',
       options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
     ),
@@ -56,9 +58,11 @@ class FireEvacuationApi {
   Future<Object?> getStudentCount({
     required String key,
     required String place,
+    required String accessToken,
   }) async => (await _dio.get<Object>(
     '/student',
     queryParameters: {'key': key, 'place': place},
+    options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
   )).data;
 
   Future<Map<String, dynamic>> postSmokeDensity({
@@ -140,10 +144,39 @@ class FireEvacuationApi {
   Options _deviceOptions(String deviceToken) =>
       Options(headers: {'X-Device-Token': deviceToken});
 
+  Future<Map<String, dynamic>> _getWithRetry(
+    Future<Response<Map<String, dynamic>>> Function() request,
+  ) async {
+    for (var attempt = 1; ; attempt++) {
+      try {
+        return _decodeResponse(await request());
+      } on DioException catch (error) {
+        if (attempt >= _maxReadAttempts || !_isRetryable(error)) rethrow;
+        await Future<void>.delayed(Duration(milliseconds: 500 * attempt));
+      }
+    }
+  }
+
+  bool _isRetryable(DioException error) {
+    if (error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout ||
+        error.type == DioExceptionType.connectionError) {
+      return true;
+    }
+    final statusCode = error.response?.statusCode;
+    return statusCode == 408 ||
+        statusCode == 429 ||
+        statusCode != null && statusCode >= 500;
+  }
+
   Future<Map<String, dynamic>> _requestMap(
     Future<Response<Map<String, dynamic>>> response,
-  ) async {
-    final data = (await response).data;
+  ) async => _decodeResponse(await response);
+
+  Map<String, dynamic> _decodeResponse(
+    Response<Map<String, dynamic>> response,
+  ) {
+    final data = response.data;
     if (data == null) {
       throw const FormatException(
         'The fire server returned an empty response.',

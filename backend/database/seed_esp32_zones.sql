@@ -22,20 +22,20 @@ BEGIN
 END
 $$;
 
-INSERT INTO zones (name, zone_type, floor)
-SELECT source.name, source.zone_type, 0
+INSERT INTO zones (name, zone_type, floor, capacity)
+SELECT source.name, source.zone_type, 0, source.capacity
 FROM (VALUES
-    ('BLOCK A', 'other'),
-    ('BLOCK B', 'other'),
-    ('BLOCK C', 'other'),
-    ('BLOCK D', 'other'),
-    ('BLOCK E', 'other'),
-    ('BLOCK F', 'other'),
-    ('Cafeteria', 'cafeteria')
-) AS source(name, zone_type)
-WHERE NOT EXISTS (
-    SELECT 1 FROM zones existing WHERE existing.name = source.name
-);
+    ('BLOCK A', 'classroom', 40),
+    ('BLOCK B', 'classroom', 40),
+    ('BLOCK C', 'classroom', 40),
+    ('BLOCK D', 'classroom', 40),
+    ('BLOCK E', 'classroom', 40),
+    ('BLOCK F', 'classroom', 40),
+    ('Cafeteria', 'cafeteria', NULL)
+) AS source(name, zone_type, capacity)
+ON CONFLICT (name) DO UPDATE
+SET zone_type = EXCLUDED.zone_type,
+    capacity = COALESCE(zones.capacity, EXCLUDED.capacity);
 
 INSERT INTO zone_risk (zone_id)
 SELECT z.id
@@ -45,6 +45,21 @@ WHERE z.name IN (
     'BLOCK E', 'BLOCK F', 'Cafeteria'
 )
 ON CONFLICT (zone_id) DO NOTHING;
+
+INSERT INTO occupancy_readings (zone_id, person_count, source)
+SELECT
+    z.id,
+    floor(random() * COALESCE(NULLIF(z.capacity, 0), 40))::integer + 1,
+    'estimated'
+FROM zones AS z
+WHERE z.name IN (
+    'BLOCK A', 'BLOCK B', 'BLOCK C', 'BLOCK D', 'BLOCK E', 'BLOCK F'
+)
+AND NOT EXISTS (
+    SELECT 1
+    FROM occupancy_readings AS readings
+    WHERE readings.zone_id = z.id
+);
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_zones_name_unique ON zones(name);
 

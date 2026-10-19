@@ -1,5 +1,7 @@
+import ast
 import os
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -8,6 +10,21 @@ from fastapi.testclient import TestClient
 from postgrest.exceptions import APIError
 
 from backend.api import server
+
+
+def _firmware_constant(folder: str, name: str):
+    firmware_path = Path(__file__).resolve().parents[1] / folder / "main.py"
+    module = ast.parse(firmware_path.read_text(encoding="utf-8"))
+    assignment = next(
+        node
+        for node in module.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == name
+            for target in node.targets
+        )
+    )
+    return ast.literal_eval(assignment.value)
 
 
 class SensorApiTests(unittest.TestCase):
@@ -147,6 +164,30 @@ class SensorApiTests(unittest.TestCase):
         response = self.client.get("/dashboard")
 
         self.assertEqual(response.status_code, 401)
+
+    def test_student_count_requires_a_supabase_bearer_token(self) -> None:
+        response = self.client.get(
+            "/student",
+            params={"key": "ESP 32 A", "place": "block"},
+        )
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_student_count_forwards_the_signed_in_user_token(self) -> None:
+        with patch.object(
+            server.db, "get_occupancy_count", return_value=12
+        ) as get_count:
+            response = self.client.get(
+                "/student",
+                params={"key": "ESP 32 A", "place": "block"},
+                headers={"Authorization": "Bearer signed-in-user-token"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), 12)
+        get_count.assert_called_once_with(
+            "ESP 32 A", "block", "signed-in-user-token"
+        )
 
     def test_dashboard_allows_browser_authorization_preflight(self) -> None:
         response = self.client.options(
@@ -349,6 +390,7 @@ class SensorApiTests(unittest.TestCase):
             occupancy={},
         )
 
+<<<<<<< HEAD
     def test_sensor_reports_accept_the_zone_map_used_by_both_boards(self) -> None:
         reports = (
             (
@@ -375,6 +417,43 @@ class SensorApiTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             persist.assert_called_once()
 
+=======
+    def test_sensor_readings_accept_the_six_documented_block_assignments(self) -> None:
+        expected_zones = {
+            "ESP 32 A": {"BLOCK A", "BLOCK B", "BLOCK C", "BLOCK D"},
+            "ESP 32 B": {"BLOCK E", "BLOCK F"},
+        }
+
+        for device_uid, zones in expected_zones.items():
+            with self.subTest(device_uid=device_uid):
+                report = server.SensorReadings(
+                    key=device_uid,
+                    readings={zone: 100 for zone in zones},
+                )
+                self.assertEqual(set(report.readings), zones)
+
+    def test_sensor_thresholds_remain_unchanged(self) -> None:
+        self.assertEqual(server.db.SMOKE_THRESHOLD, 1300)
+        self.assertEqual(server.db.TEMPERATURE_THRESHOLD, 55)
+        self.assertEqual(_firmware_constant("esp32_a", "SMOKE_THRESHOLD"), 1300)
+        self.assertEqual(
+            _firmware_constant("esp32_a", "TEMPERATURE_THRESHOLD"), 55
+        )
+        self.assertEqual(_firmware_constant("esp32_b", "SMOKE_THRESHOLD"), 1300)
+
+    def test_firmware_block_maps_match_api_device_assignments(self) -> None:
+        firmware_devices = {
+            "ESP 32 A": "esp32_a",
+            "ESP 32 B": "esp32_b",
+        }
+        for device_uid, folder in firmware_devices.items():
+            with self.subTest(device_uid=device_uid):
+                self.assertEqual(
+                    set(_firmware_constant(folder, "SMOKE_SENSOR_PINS")),
+                    set(server.db.DEVICE_ZONES[device_uid]),
+                )
+
+>>>>>>> 406737c (final commit)
     def test_invalid_zone_is_rejected_before_persistence(self) -> None:
         with patch.object(server.db, "persist_sensor_report") as persist:
             response = self.client.post(

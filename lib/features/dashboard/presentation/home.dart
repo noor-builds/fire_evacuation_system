@@ -129,6 +129,10 @@ class _DashboardState extends State<Dashboard> {
       }
     } on FormatException catch (error) {
       if (mounted) setState(() => _apiError = error.message);
+    } on Exception catch (error) {
+      if (mounted) {
+        setState(() => _apiError = 'Could not check backend status: $error');
+      }
     }
   }
 
@@ -139,8 +143,9 @@ class _DashboardState extends State<Dashboard> {
       return responseData['detail'].toString();
     }
     if (error.response == null) {
+      final statusUrl = Uri.parse(_api.baseUrl).resolve('status');
       return 'Cannot reach the backend at ${_api.baseUrl}. Open '
-          '${_api.baseUrl}/status in a browser. If it is deployed on Vercel, '
+          '$statusUrl in a browser. If it is deployed on Vercel, '
           'confirm the FastAPI app is the deployed project and the Vercel '
           'environment variables are set. For local testing, start '
           '`python -m backend.main` and pass API_BASE_URL to Flutter.';

@@ -102,7 +102,11 @@ class _NavigationEntry extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
-          child: Container(
+          child: AnimatedContainer(
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               color: selected
@@ -112,14 +116,25 @@ class _NavigationEntry extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(icon, size: 19, color: foreground),
+                AnimatedScale(
+                  scale: selected ? 1.12 : 1,
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 220),
+                  curve: Curves.easeOutBack,
+                  child: Icon(icon, size: 19, color: foreground),
+                ),
                 const SizedBox(width: 13),
-                Text(
-                  label,
+                AnimatedDefaultTextStyle(
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
                   style: TextStyle(
                     color: foreground,
                     fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                   ),
+                  child: Text(label),
                 ),
               ],
             ),

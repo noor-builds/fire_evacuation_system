@@ -6,7 +6,7 @@ import 'package:fire_evacuation_app/core/fire_evacuation_api.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('default API URL uses the local FastAPI backend origin', () {
+  test('default API URL uses the deployed FastAPI backend origin', () {
     final uri = Uri.parse(FireEvacuationApi.defaultBaseUrl);
 
     expect(uri.origin, 'https://fireevacuationsystem.vercel.app');
@@ -52,9 +52,46 @@ void main() {
     );
     expect(adapter.requestOptions?.path, '/dashboard');
   });
+
+  test('student count request includes the signed-in user token', () async {
+    final adapter = _CaptureAdapter();
+    final dio = Dio(BaseOptions(baseUrl: 'http://test.invalid'))
+      ..httpClientAdapter = adapter;
+
+    await FireEvacuationApi(dio: dio).getStudentCount(
+      key: 'ESP 32 A',
+      place: 'block',
+      accessToken: 'signed-in-user-token',
+    );
+
+    expect(adapter.requestOptions?.path, '/student');
+    expect(
+      adapter.requestOptions?.headers['Authorization'],
+      'Bearer signed-in-user-token',
+    );
+    expect(adapter.requestOptions?.queryParameters, {
+      'key': 'ESP 32 A',
+      'place': 'block',
+    });
+  });
+
+  test('status request retries a temporary server error', () async {
+    final adapter = _CaptureAdapter(failFirstRequestWith503: true);
+    final dio = Dio(BaseOptions(baseUrl: 'http://test.invalid'))
+      ..httpClientAdapter = adapter;
+
+    await FireEvacuationApi(dio: dio).getStatus();
+
+    expect(adapter.requestCount, 2);
+    expect(adapter.requestOptions?.path, '/status');
+  });
 }
 
 class _CaptureAdapter implements HttpClientAdapter {
+  _CaptureAdapter({this.failFirstRequestWith503 = false});
+
+  final bool failFirstRequestWith503;
+  int requestCount = 0;
   RequestOptions? requestOptions;
 
   @override
@@ -63,7 +100,17 @@ class _CaptureAdapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    requestCount++;
     requestOptions = options;
+    if (failFirstRequestWith503 && requestCount == 1) {
+      return ResponseBody.fromString(
+        '{"detail":"temporarily unavailable"}',
+        503,
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        },
+      );
+    }
     return ResponseBody.fromString(
       jsonEncode({
         'zones': [],

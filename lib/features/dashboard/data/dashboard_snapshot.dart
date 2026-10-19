@@ -73,6 +73,8 @@ class DashboardSnapshot {
     return latestByZone.values.fold(0, (total, count) => total + count);
   }
 
+  bool get hasOccupancyReadings => occupancyReadings.isNotEmpty;
+
   int get totalCapacity => zones.fold<int>(
     0,
     (total, zone) => total + ((zone['capacity'] as num?)?.toInt() ?? 0),

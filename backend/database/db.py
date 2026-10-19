@@ -393,13 +393,22 @@ def persist_sensor_report(
     }
 
 
-def get_occupancy_count(device_uid: str, place: str) -> int:
+def _authenticated_client(access_token: str) -> tuple[Client, Any]:
+    client = _create_client(allow_publishable_key=True)
+    client.postgrest.auth(access_token)
+    user = client.auth.get_user(access_token)
+    if user is None or user.user is None:
+        raise PermissionError("The Supabase access token is invalid or expired.")
+    return client, user
+
+
+def get_occupancy_count(device_uid: str, place: str, access_token: str) -> int:
     if device_uid not in DEVICE_ZONES:
         raise ValueError("Unknown ESP32 device.")
     if place not in {"class", "block"}:
         raise ValueError("place must be class or block.")
 
-    client = get_client()
+    client, _ = _authenticated_client(access_token)
     zones = (
         client.table("zones")
         .select("id,zone_type")
@@ -431,11 +440,7 @@ def get_occupancy_count(device_uid: str, place: str) -> int:
 
 
 def get_dashboard_snapshot(access_token: str) -> dict[str, Any]:
-    client = _create_client(allow_publishable_key=True)
-    client.postgrest.auth(access_token)
-    user = client.auth.get_user(access_token)
-    if user is None or user.user is None:
-        raise PermissionError("The Supabase access token is invalid or expired.")
+    client, user = _authenticated_client(access_token)
 
     profile_query = (
         client.table("users")

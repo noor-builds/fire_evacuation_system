@@ -122,24 +122,44 @@ class DashboardOverview extends StatelessWidget {
               onRefresh: onRefresh,
             )
           else
-            switch (safeIndex) {
-              0 => _OverviewContent(
-                snapshot: snapshot!,
-                onAcknowledgeAlert: onAcknowledgeAlert,
+            AnimatedSwitcher(
+              duration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 320),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) {
+                final slide = Tween<Offset>(
+                  begin: const Offset(0, 0.015),
+                  end: Offset.zero,
+                ).animate(animation);
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(position: slide, child: child),
+                );
+              },
+              child: KeyedSubtree(
+                key: ValueKey(safeIndex),
+                child: switch (safeIndex) {
+                  0 => _OverviewContent(
+                    snapshot: snapshot!,
+                    onAcknowledgeAlert: onAcknowledgeAlert,
+                  ),
+                  1 => _LiveMapContent(snapshot: snapshot!),
+                  2 => _SensorsContent(snapshot: snapshot!),
+                  3 => _OccupancyContent(snapshot: snapshot!),
+                  4 => _AlertsContent(
+                    snapshot: snapshot!,
+                    onAcknowledgeAlert: onAcknowledgeAlert,
+                  ),
+                  _ => _SettingsContent(
+                    snapshot: snapshot!,
+                    apiConnected: apiConnected,
+                    apiError: apiError,
+                  ),
+                },
               ),
-              1 => _LiveMapContent(snapshot: snapshot!),
-              2 => _SensorsContent(snapshot: snapshot!),
-              3 => _OccupancyContent(snapshot: snapshot!),
-              4 => _AlertsContent(
-                snapshot: snapshot!,
-                onAcknowledgeAlert: onAcknowledgeAlert,
-              ),
-              _ => _SettingsContent(
-                snapshot: snapshot!,
-                apiConnected: apiConnected,
-                apiError: apiError,
-              ),
-            },
+            ),
         ],
       ),
     );
@@ -175,35 +195,73 @@ class _OverviewContent extends StatelessWidget {
             mainAxisSpacing: 12,
             childAspectRatio: constraints.maxWidth < 600 ? 1.45 : 1.65,
             children: [
-              DashboardStatCard(
-                label: 'PEOPLE INSIDE',
-                value: '$occupancy',
-                description: 'Latest count per zone',
-                icon: Icons.groups_rounded,
-                color: const Color(0xFF5CB5F2),
+              DashboardEntrance(
+                index: 0,
+                child: DashboardStatCard(
+                  label: 'PEOPLE INSIDE',
+                  value: snapshot.hasOccupancyReadings ? '$occupancy' : '—',
+                  description: snapshot.hasOccupancyReadings
+                      ? 'Latest count per zone'
+                      : 'No occupancy readings',
+                  icon: Icons.groups_rounded,
+                  color: const Color(0xFF5CB5F2),
+                ),
               ),
-              DashboardStatCard(
-                label: 'OCCUPANCY',
-                value: capacity == 0 ? '—' : '$occupancyPercent%',
-                description: capacity == 0 ? 'No capacity set' : 'Of capacity',
-                icon: Icons.analytics_rounded,
-                color: const Color(0xFF55C987),
+              DashboardEntrance(
+                index: 1,
+                child: DashboardStatCard(
+                  label: 'OCCUPANCY',
+                  value: capacity == 0 ? '—' : '$occupancyPercent%',
+                  description: capacity == 0
+                      ? 'No capacity set'
+                      : 'Of capacity',
+                  icon: Icons.analytics_rounded,
+                  color: const Color(0xFF55C987),
+                ),
               ),
-              DashboardStatCard(
-                label: 'DANGER ZONES',
-                value: '${snapshot.dangerZoneCount}',
-                description: 'High or critical risk',
-                icon: Icons.warning_amber_rounded,
-                color: const Color(0xFFE63946),
+              DashboardEntrance(
+                index: 2,
+                child: DashboardStatCard(
+                  label: 'DANGER ZONES',
+                  value: '${snapshot.dangerZoneCount}',
+                  description: 'High or critical risk',
+                  icon: Icons.warning_amber_rounded,
+                  color: const Color(0xFFE63946),
+                ),
               ),
-              DashboardStatCard(
-                label: 'SAFE EXITS',
-                value: '${snapshot.availableExits}',
-                description: 'Available exits',
-                icon: Icons.exit_to_app_rounded,
-                color: const Color(0xFF5CB5F2),
+              DashboardEntrance(
+                index: 3,
+                child: DashboardStatCard(
+                  label: 'SAFE EXITS',
+                  value: '${snapshot.availableExits}',
+                  description: 'Available exits',
+                  icon: Icons.exit_to_app_rounded,
+                  color: const Color(0xFF5CB5F2),
+                ),
               ),
             ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        DashboardEntrance(
+          index: 4,
+          child: _DataPanel(
+            title: 'LATEST SENSOR READINGS',
+            emptyMessage:
+                'No ESP32 readings received yet. Check each board’s Wi-Fi, '
+                'API_URL, DEVICE_API_TOKEN, and serial output.',
+            rows: snapshot.sensorReadings.take(6).map((reading) {
+              final zoneName = _zoneName(snapshot.zones, reading['zone_id']);
+              final value = reading['value']?.toString() ?? '—';
+              final unit = reading['unit']?.toString() ?? '';
+              return _DataRow(
+                title: '$zoneName · $value $unit'.trim(),
+                subtitle:
+                    '${reading['sensor_id'] ?? 'Sensor'} · '
+                    '${_time(reading['recorded_at'])}',
+                icon: Icons.multiline_chart_rounded,
+              );
+            }).toList(),
           ),
         ),
         const SizedBox(height: 18),
@@ -212,16 +270,25 @@ class _OverviewContent extends StatelessWidget {
             if (constraints.maxWidth < 900) {
               return Column(
                 children: [
-                  CampusMapHazardApp(snapshot: snapshot),
-                  const SizedBox(height: 16),
-                  DashboardRouteCard(
-                    routes: snapshot.routes,
-                    zones: snapshot.zones,
+                  DashboardEntrance(
+                    index: 5,
+                    child: CampusMapHazardApp(snapshot: snapshot),
                   ),
                   const SizedBox(height: 16),
-                  _AlertsPanel(
-                    alerts: snapshot.alerts,
-                    onAcknowledgeAlert: onAcknowledgeAlert,
+                  DashboardEntrance(
+                    index: 6,
+                    child: DashboardRouteCard(
+                      routes: snapshot.routes,
+                      zones: snapshot.zones,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  DashboardEntrance(
+                    index: 6,
+                    child: _AlertsPanel(
+                      alerts: snapshot.alerts,
+                      onAcknowledgeAlert: onAcknowledgeAlert,
+                    ),
                   ),
                 ],
               );
@@ -231,21 +298,30 @@ class _OverviewContent extends StatelessWidget {
               children: [
                 Expanded(
                   flex: 7,
-                  child: CampusMapHazardApp(snapshot: snapshot),
+                  child: DashboardEntrance(
+                    index: 5,
+                    child: CampusMapHazardApp(snapshot: snapshot),
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   flex: 4,
                   child: Column(
                     children: [
-                      DashboardRouteCard(
-                        routes: snapshot.routes,
-                        zones: snapshot.zones,
+                      DashboardEntrance(
+                        index: 5,
+                        child: DashboardRouteCard(
+                          routes: snapshot.routes,
+                          zones: snapshot.zones,
+                        ),
                       ),
                       const SizedBox(height: 16),
-                      _AlertsPanel(
-                        alerts: snapshot.alerts,
-                        onAcknowledgeAlert: onAcknowledgeAlert,
+                      DashboardEntrance(
+                        index: 6,
+                        child: _AlertsPanel(
+                          alerts: snapshot.alerts,
+                          onAcknowledgeAlert: onAcknowledgeAlert,
+                        ),
                       ),
                     ],
                   ),
@@ -348,23 +424,48 @@ class _OccupancyContent extends StatelessWidget {
   final DashboardSnapshot snapshot;
 
   @override
-  Widget build(BuildContext context) => _DataPanel(
-    title: 'LATEST OCCUPANCY BY ZONE',
-    emptyMessage: 'No occupancy readings have been recorded yet.',
-    rows: snapshot.latestOccupancyByZone.map((reading) {
-      final zone = snapshot.zones.where(
-        (item) => item['id'] == reading['zone_id'],
-      );
-      final zoneName = zone.isEmpty ? 'Unknown zone' : zone.first['name'];
-      return _DataRow(
-        title: '$zoneName',
-        subtitle:
-            '${reading['person_count'] ?? 0} people · '
-            '${_time(reading['recorded_at'])}',
-        icon: Icons.groups_rounded,
-      );
-    }).toList(),
-  );
+  Widget build(BuildContext context) {
+    const blockNames = [
+      'BLOCK A',
+      'BLOCK B',
+      'BLOCK C',
+      'BLOCK D',
+      'BLOCK E',
+      'BLOCK F',
+    ];
+    final zonesByName = {
+      for (final zone in snapshot.zones)
+        if (zone['name'] != null) zone['name'].toString(): zone,
+    };
+    final latestByZone = {
+      for (final reading in snapshot.latestOccupancyByZone)
+        if (reading['zone_id'] != null) reading['zone_id'].toString(): reading,
+    };
+
+    return _DataPanel(
+      title: 'LATEST OCCUPANCY BY BLOCK',
+      emptyMessage: 'No classroom blocks are configured.',
+      rows: blockNames.map((blockName) {
+        final zone = zonesByName[blockName];
+        final reading = zone == null
+            ? null
+            : latestByZone[zone['id']?.toString()];
+        final source = reading?['source']?.toString();
+        final occupancyDescription = reading == null
+            ? 'No occupancy reading received'
+            : source == 'estimated'
+            ? '${reading['person_count'] ?? 0} children · Random demo estimate'
+            : '${reading['person_count'] ?? 0} children · '
+                  '${_time(reading['recorded_at'])}';
+
+        return _DataRow(
+          title: blockName,
+          subtitle: occupancyDescription,
+          icon: Icons.groups_rounded,
+        );
+      }).toList(),
+    );
+  }
 }
 
 class _AlertsContent extends StatelessWidget {
@@ -514,7 +615,12 @@ class _DataPanel extends StatelessWidget {
               ),
             )
           else
-            ...rows,
+            for (var index = 0; index < rows.length; index++)
+              DashboardEntrance(
+                key: ValueKey('$title-$index'),
+                index: index,
+                child: rows[index],
+              ),
         ],
       ),
     ),
@@ -596,7 +702,11 @@ class _ConnectionBadge extends StatelessWidget {
   final Color color;
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => AnimatedContainer(
+    duration: MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 280),
+    curve: Curves.easeOutCubic,
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     decoration: BoxDecoration(
       color: color.withValues(alpha: 0.1),
@@ -605,14 +715,44 @@ class _ConnectionBadge extends StatelessWidget {
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.circle, size: 8, color: color),
-        const SizedBox(width: 7),
-        Text(
-          label,
-          style: TextStyle(
+        AnimatedSwitcher(
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 220),
+          transitionBuilder: (child, animation) => ScaleTransition(
+            scale: animation,
+            child: FadeTransition(opacity: animation, child: child),
+          ),
+          child: Icon(
+            Icons.circle,
+            key: ValueKey(color),
+            size: 8,
             color: color,
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(width: 7),
+        AnimatedSwitcher(
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 220),
+          transitionBuilder: (child, animation) => FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.15),
+                end: Offset.zero,
+              ).animate(animation),
+              child: child,
+            ),
+          ),
+          child: Text(
+            label,
+            key: ValueKey(label),
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],
@@ -703,6 +843,15 @@ String _time(Object? timestamp) {
   if (dateTime == null) return 'Time unavailable';
   return '${dateTime.hour.toString().padLeft(2, '0')}:'
       '${dateTime.minute.toString().padLeft(2, '0')}';
+}
+
+String _zoneName(List<Map<String, dynamic>> zones, Object? zoneId) {
+  for (final zone in zones) {
+    if (zone['id']?.toString() == zoneId?.toString()) {
+      return zone['name']?.toString() ?? 'Unknown zone';
+    }
+  }
+  return 'Unknown zone';
 }
 
 String _profileSummary(Map<String, dynamic> profile) {
