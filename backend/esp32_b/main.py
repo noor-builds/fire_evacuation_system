@@ -68,7 +68,12 @@ def post_sensor_readings(readings):
     )
     try:
         if response.status_code < 200 or response.status_code >= 300:
-            raise OSError("Sensor API returned HTTP {}".format(response.status_code))
+            detail = response.text[:160]
+            raise OSError(
+                "Sensor API returned HTTP {}: {}".format(
+                    response.status_code, detail
+                )
+            )
         print("Sensor report stored:", response.text)
     finally:
         response.close()

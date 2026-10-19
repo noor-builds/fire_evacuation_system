@@ -146,6 +146,14 @@ The firmware reports ADC counts from 0 to 4095, not calibrated ppm. The
 `SMOKE_THRESHOLD = 1300` value is a starting point; check clean-air readings
 and calibrate it for the exact sensor/module before relying on alarms.
 
+Check the serial output after boot: `Wi-Fi connected` should include an IP
+address, followed by `Sensor report stored` every few seconds. An
+`HTTP 401: Invalid device token` response means Wi-Fi and the API URL work but
+the board's `DEVICE_API_TOKEN` does not match the backend's deployed setting.
+Set the same newly generated token in the backend environment and each board's
+private `device_config.py`, then redeploy the backend and restart both boards.
+Do not put the token in a tracked example file.
+
 ## 4. Run Flutter
 
 The app uses Supabase Auth for sign-in, then sends the signed-in session's
