@@ -33,7 +33,7 @@ for zone_name, pin_number in SMOKE_SENSOR_PINS.items():
     sensor.atten(ADC.ATTN_11DB)
     sensors[zone_name] = sensor
 
-temperature_sensor = dht.DHT22(Pin(TEMPERATURE_SENSOR_PIN))
+temperature_sensor = dht.DHT11(Pin(TEMPERATURE_SENSOR_PIN))
 
 
 def evacuation_gradient_lights(danger_zone, key, light_strip=None):
