@@ -390,7 +390,6 @@ class SensorApiTests(unittest.TestCase):
             occupancy={},
         )
 
-<<<<<<< HEAD
     def test_sensor_reports_accept_the_zone_map_used_by_both_boards(self) -> None:
         reports = (
             (
@@ -417,7 +416,6 @@ class SensorApiTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             persist.assert_called_once()
 
-=======
     def test_sensor_readings_accept_the_six_documented_block_assignments(self) -> None:
         expected_zones = {
             "ESP 32 A": {"BLOCK A", "BLOCK B", "BLOCK C", "BLOCK D"},
@@ -453,7 +451,6 @@ class SensorApiTests(unittest.TestCase):
                     set(server.db.DEVICE_ZONES[device_uid]),
                 )
 
->>>>>>> 406737c (final commit)
     def test_invalid_zone_is_rejected_before_persistence(self) -> None:
         with patch.object(server.db, "persist_sensor_report") as persist:
             response = self.client.post(
