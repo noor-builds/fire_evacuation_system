@@ -101,7 +101,8 @@ replace it in Vercel and on both boards before using the system again.
 Choose one API connection:
 
 - **Use the deployed Vercel API:** set `API_URL` in both board config files to
-  `https://fireevacuationsystem.vercel.app/sensor_readings`. The Vercel backend
+  `https://your-vercel-project.vercel.app/sensor_readings` using the actual
+  deployment hostname. The Vercel backend
   must have `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (or
   `SUPABASE_SERVICE_ROLE_KEY`), and `DEVICE_API_TOKEN` set. Redeploy after
   changing Vercel environment variables.
@@ -195,16 +196,17 @@ Only database zones explicitly matched to a position on the schematic are colore
 on the map. Other active zones are listed above the map as unmapped sensor alerts
 so they are visible without being assigned an unverified location.
 
+Start the local backend with `python -m backend.main`, then launch Flutter Web:
+
 ```powershell
 flutter run `
   --dart-define=SUPABASE_URL=https://your-project.supabase.co `
   --dart-define=SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ```
 
-The default API origin is `https://fireevacuationsystem.vercel.app`; the app
-appends `/dashboard` for dashboard requests. For local testing, start the
-backend with `python -m backend.main` and set
-`--dart-define=API_BASE_URL=http://127.0.0.1:8000`. For the Android emulator, set
+The default API origin is `http://127.0.0.1:8000`; the app appends `/dashboard`
+for dashboard requests. For local testing, start the backend with
+`python -m backend.main`. For the Android emulator, set
 `--dart-define=API_BASE_URL=http://10.0.2.2:8000`; for a physical phone, use
 the computer's reachable LAN address. To use a deployed backend, set
 `API_BASE_URL` to its origin. The API handles browser `OPTIONS` preflight requests for the

@@ -22,7 +22,6 @@ class CampusMapHazardApp extends StatelessWidget {
     );
   }
 }
-
 class CampusZone {
   final String id;
   final String label;
@@ -66,125 +65,125 @@ class _HazardMapScreenState extends State<HazardMapScreen>
     'reading_room': CampusZone(
       id: 'reading_room',
       label: 'Reading Room',
-      imageAsset: 'assets/reading_room.jpg',
+      imageAsset: 'assets/unnamed.png',
       description: 'Quiet library study halls and document archives.',
     ),
     'block_1': CampusZone(
       id: 'block_1',
       label: 'Block-I',
-      imageAsset: 'assets/block_1.jpg',
+      imageAsset: 'assets/unnamed.png',
       description: 'North academic wing, labs, and lecture classrooms.',
     ),
     'block_2': CampusZone(
       id: 'block_2',
       label: 'Block-II',
-      imageAsset: 'assets/block_2.jpg',
+      imageAsset: 'assets/unnamed.png',
       description: 'Upper tutorial rooms and faculty chambers.',
     ),
     'block_a': CampusZone(
       id: 'block_a',
       label: 'Block-A',
-      imageAsset: 'assets/block_a.jpg',
+      imageAsset: 'assets/unnamed.png',
       description: 'Central administrative department and registrar desks.',
       databaseZoneName: 'BLOCK A',
     ),
     'conference_hall': CampusZone(
       id: 'conference_hall',
       label: 'Conference Hall',
-      imageAsset: 'assets/conference_hall.jpg',
+      imageAsset: 'assets/unnamed.png',
       description: 'Executive seminar and syndicate conference chambers.',
     ),
     'central_lawn': CampusZone(
       id: 'central_lawn',
       label: 'Central Lawn',
-      imageAsset: 'assets/central_lawn.jpg',
+      imageAsset: 'assets/unnamed.png',
       description: 'Main campus open green commons and gathering ground.',
     ),
     'kapalala': CampusZone(
       id: 'kapalala',
       label: 'Kapalala',
-      imageAsset: 'assets/kapalala.jpg',
+      imageAsset: 'assets/unnamed.png',
       description: 'Open air amphitheatre, pavilion, and stage canopy.',
     ),
     'ef_park': CampusZone(
       id: 'ef_park',
       label: 'E/F Park',
-      imageAsset: 'assets/ef_park.jpg',
+      imageAsset: 'assets/unnamed.png',
       description: 'Botanical promenade and perimeter walkway.',
     ),
     'science_park': CampusZone(
       id: 'science_park',
       label: 'Science Park',
-      imageAsset: 'assets/science_park.jpg',
+      imageAsset: 'assets/unnamed.png',
       description: 'Outdoor scientific apparatus and interactive models.',
     ),
     'reception': CampusZone(
       id: 'reception',
       label: 'Reception',
-      imageAsset: 'assets/reception.jpg',
+      imageAsset: 'assets/unnamed.png',
       description: 'Campus reception desk, enquiries, and visitor check-in.',
     ),
     'gate_1': CampusZone(
       id: 'gate_1',
       label: 'Gate No. 1',
-      imageAsset: 'assets/gate_1.jpg',
+      imageAsset: 'assets/unnamed.png',
       description: 'Primary vehicular entrance and security booth.',
     ),
     'x_corridor': CampusZone(
       id: 'x_corridor',
       label: 'X-I | X-G | X-F | X-E Road',
-      imageAsset: 'assets/service_road.jpg',
+      imageAsset: 'assets/unnamed.png',
       description: 'Transitional pedestrian corridor and cross-lane junctions.',
     ),
     'gate_2_top': CampusZone(
       id: 'gate_2_top',
       label: 'Gate No. 2',
-      imageAsset: 'assets/gate_2.jpg',
+      imageAsset: 'assets/unnamed.png',
       description: 'Eastern entrance checkpoint and transit portal.',
     ),
     'canteen_ramp': CampusZone(
       id: 'canteen_ramp',
       label: 'Canteen & Ramp',
-      imageAsset: 'assets/canteen.jpg',
+      imageAsset: 'assets/unnamed.png',
       description: 'Campus cafeteria, food courts, and wheelchair ramps.',
       databaseZoneName: 'Cafeteria',
     ),
     'fields': CampusZone(
       id: 'fields',
       label: 'D-Cent & Q-Eai\nField Strip',
-      imageAsset: 'assets/fields.jpg',
+      imageAsset: 'assets/unnamed.png',
       description: 'Western sports field strip and shaded tree boundary.',
     ),
     'block_p': CampusZone(
       id: 'block_p',
       label: 'Block P',
-      imageAsset: 'assets/block_p.jpg',
+      imageAsset: 'assets/unnamed.png',
       description: 'South major academic complex, design studios, and labs.',
     ),
     'dispensary': CampusZone(
       id: 'dispensary',
       label: 'Dispensary & Lift',
-      imageAsset: 'assets/dispensary.jpg',
+      imageAsset: 'assets/unnamed.png',
       description:
           'First aid clinic, medical emergency bay, and tower elevator.',
     ),
     'auditorium': CampusZone(
       id: 'auditorium',
       label: 'Auditorium\n(Basement)',
-      imageAsset: 'assets/auditorium.jpg',
+      imageAsset: 'assets/unnamed.png',
       description:
           'Underground events auditorium, theater stage, and acoustics arena.',
     ),
     'south_service_lane': CampusZone(
       id: 'south_service_lane',
       label: 'South Service Lane',
-      imageAsset: 'assets/service_lane.jpg',
+      imageAsset: 'assets/unnamed.png',
       description: 'Emergency vehicle bypass and logistics accessway.',
     ),
     'grapche': CampusZone(
       id: 'grapche',
       label: 'Grapche',
-      imageAsset: 'assets/grapche.jpg',
+      imageAsset: 'assets/unnamed.png',
       description: 'Southern terminal gate and outer bypass loop.',
     ),
   };
@@ -273,7 +272,7 @@ class _HazardMapScreenState extends State<HazardMapScreen>
                           zone.imageAsset,
                           height: 190,
                           width: double.infinity,
-                          fit: BoxFit.cover,
+                          fit: BoxFit.contain,
                           errorBuilder: (context, error, stackTrace) =>
                               Container(
                                 height: 170,

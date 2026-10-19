@@ -16,7 +16,7 @@ class FireEvacuationApi {
 
   static const defaultBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://fireevacuationsystem.vercel.app/',
+    defaultValue: 'http://127.0.0.1:8000/',
   );
 
   static String _cleanBaseUrl(String value) {
