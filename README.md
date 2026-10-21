@@ -85,7 +85,7 @@ Set `CORS_ORIGINS` to the exact deployed frontend origin, for example
 environment variables, then verify:
 
 ```text
-https://your-vercel-project.vercel.app/status
+https://fireevacuationsystem.vercel.app/status
 ```
 
 ## 3. Configure the ESP32 boards
@@ -101,8 +101,7 @@ replace it in Vercel and on both boards before using the system again.
 Choose one API connection:
 
 - **Use the deployed Vercel API:** set `API_URL` in both board config files to
-  `https://your-vercel-project.vercel.app/sensor_readings` using the actual
-  deployment hostname. The Vercel backend
+  `https://fireevacuationsystem.vercel.app/sensor_readings`. The Vercel backend
   must have `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (or
   `SUPABASE_SERVICE_ROLE_KEY`), and `DEVICE_API_TOKEN` set. Redeploy after
   changing Vercel environment variables.
@@ -188,6 +187,16 @@ live sensor measurements. The command center shows the latest received sensor
 readings; an empty list means the boards have not successfully posted data to
 this backend yet.
 
+For temporary dashboard bring-up, both example board configs set
+`SIMULATE_SENSORS = True`. The firmware sends clearly marked demo reports with
+safe random smoke values (120–900 ADC counts) and, on ESP 32 A, temperature
+values (22–34 °C), plus estimated people counts (0–30 per supported block); the
+buzzer stays off and no fire alerts are generated. Occupancy rows are marked
+`estimated`. The dashboard labels sensor reports `DEMO DATA`. Do not use demo
+readings for fire safety decisions. After connecting the real sensors, set
+`SIMULATE_SENSORS = False` in each private `device_config.py` and reflash both
+boards.
+
 The campus map reads high/critical zone risk and active incidents from this live
 dashboard snapshot. Sensor readings update the risk and automatically create or
 resolve incidents; the map has no manual declare/clear control. Acknowledging an
@@ -204,9 +213,10 @@ flutter run `
   --dart-define=SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ```
 
-The default API origin is `http://127.0.0.1:8000`; the app appends `/dashboard`
-for dashboard requests. For local testing, start the backend with
-`python -m backend.main`. For the Android emulator, set
+The default API origin is `https://fireevacuationsystem.vercel.app`; the app
+appends `/dashboard` for dashboard requests. For local testing, start the
+backend with `python -m backend.main` and set
+`--dart-define=API_BASE_URL=http://127.0.0.1:8000`. For the Android emulator, set
 `--dart-define=API_BASE_URL=http://10.0.2.2:8000`; for a physical phone, use
 the computer's reachable LAN address. To use a deployed backend, set
 `API_BASE_URL` to its origin. The API handles browser `OPTIONS` preflight requests for the

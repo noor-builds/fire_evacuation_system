@@ -388,6 +388,7 @@ class SensorApiTests(unittest.TestCase):
             readings={"BLOCK A": 210, "BLOCK B": 125},
             temperature=24.5,
             occupancy={},
+            simulation=False,
         )
 
     def test_sensor_reports_accept_the_zone_map_used_by_both_boards(self) -> None:

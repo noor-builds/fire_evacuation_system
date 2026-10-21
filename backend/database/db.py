@@ -261,6 +261,7 @@ def persist_sensor_report(
     readings: dict[str, float],
     temperature: float | None = None,
     occupancy: dict[str, int] | None = None,
+    simulation: bool = False,
 ) -> dict[str, Any]:
     if device_uid not in DEVICE_ZONES:
         raise ValueError("Unknown ESP32 device.")
@@ -368,7 +369,7 @@ def persist_sensor_report(
             {
                 "zone_id": zones[zone_name],
                 "person_count": person_count,
-                "source": "sensor",
+                "source": "estimated" if simulation else "sensor",
             }
         ).execute()
         recorded += 1
@@ -382,6 +383,7 @@ def persist_sensor_report(
                 "readings": readings,
                 "temperature": temperature,
                 "occupancy": occupancy or {},
+                "simulation": simulation,
             },
         }
     ).execute()
@@ -390,6 +392,7 @@ def persist_sensor_report(
         "stored_readings": recorded,
         "alerts": alerts,
         "status": "fire_detected" if alerts else "safe",
+        "simulation": simulation,
     }
 
 
@@ -514,6 +517,15 @@ def get_dashboard_snapshot(access_token: str) -> dict[str, Any]:
             .eq("is_recommended", True)
             .order("calculated_at", desc=True)
             .limit(10)
+            .execute()
+            .data
+        ),
+        "system_events": (
+            client.table("system_events")
+            .select("event_type,source,payload,created_at")
+            .eq("event_type", "sensor_report_received")
+            .order("created_at", desc=True)
+            .limit(20)
             .execute()
             .data
         ),

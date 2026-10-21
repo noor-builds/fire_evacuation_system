@@ -246,7 +246,9 @@ class _OverviewContent extends StatelessWidget {
         DashboardEntrance(
           index: 4,
           child: _DataPanel(
-            title: 'LATEST SENSOR READINGS',
+            title: snapshot.hasSimulatedSensorReports
+                ? 'LATEST SENSOR READINGS · DEMO DATA'
+                : 'LATEST SENSOR READINGS',
             emptyMessage:
                 'No ESP32 readings received yet. Check each board’s Wi-Fi, '
                 'API_URL, DEVICE_API_TOKEN, and serial output.',

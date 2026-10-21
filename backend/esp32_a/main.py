@@ -2,14 +2,14 @@ import json
 import random
 import time
 
-import neopixel #A module in machine
-
-import dht
 import urequests
-from machine import ADC, Pin
 
 import boot
-from device_config import API_URL, DEVICE_API_TOKEN
+from device_config import API_URL, DEVICE_API_TOKEN, SIMULATE_SENSORS
+
+if not SIMULATE_SENSORS:
+    import dht
+    from machine import ADC, Pin
 
 DEVICE_UID = "ESP 32 A"
 NAME = DEVICE_UID
@@ -25,15 +25,19 @@ SMOKE_SENSOR_PINS = {
     "BLOCK D": 35,
 }
 
-buzzer = Pin(BUZZER_PIN, Pin.OUT)
-buzzer.value(0)
-sensors = {}
-for zone_name, pin_number in SMOKE_SENSOR_PINS.items():
-    sensor = ADC(Pin(pin_number))
-    sensor.atten(ADC.ATTN_11DB)
-    sensors[zone_name] = sensor
-
-temperature_sensor = dht.DHT11(Pin(TEMPERATURE_SENSOR_PIN))
+if SIMULATE_SENSORS:
+    buzzer = None
+    sensors = {}
+    temperature_sensor = None
+else:
+    buzzer = Pin(BUZZER_PIN, Pin.OUT)
+    buzzer.value(0)
+    sensors = {}
+    for zone_name, pin_number in SMOKE_SENSOR_PINS.items():
+        sensor = ADC(Pin(pin_number))
+        sensor.atten(ADC.ATTN_11DB)
+        sensors[zone_name] = sensor
+    temperature_sensor = dht.DHT11(Pin(TEMPERATURE_SENSOR_PIN))
 
 
 def evacuation_gradient_lights(danger_zone, key, light_strip=None):
@@ -111,8 +115,13 @@ def get_amount_of_students(key):
     return random.randint(1, 43)
 
 
-def post_sensor_readings(readings, temperature):
-    payload = {"key": DEVICE_UID, "readings": readings}
+def post_sensor_readings(readings, temperature, occupancy):
+    payload = {
+        "key": DEVICE_UID,
+        "readings": readings,
+        "occupancy": occupancy,
+        "simulation": SIMULATE_SENSORS,
+    }
     if temperature is not None:
         payload["temp"] = temperature
     headers = {"Content-Type": "application/json"}
@@ -142,18 +151,33 @@ def run_fire_safety_system(key=DEVICE_UID):
         raise ValueError("This device only runs as {}".format(DEVICE_UID))
     boot.connect_wifi()
     while True:
-        readings = {name: sensor.read() for name, sensor in sensors.items()}
-        temperature = None
-        try:
-            temperature_sensor.measure()
-            temperature = temperature_sensor.temperature()
-        except OSError as error:
-            print("Cafeteria temperature sensor read failed:", error)
+        if SIMULATE_SENSORS:
+            readings = {
+                name: random.randint(120, 900) for name in SMOKE_SENSOR_PINS
+            }
+            occupancy = {
+                name: random.randint(0, 30) for name in SMOKE_SENSOR_PINS
+            }
+            temperature = random.randint(22, 34)
+            print(
+                "DEMO DATA ONLY - randomized smoke, occupancy, and "
+                "temperature readings"
+            )
+        else:
+            readings = {name: sensor.read() for name, sensor in sensors.items()}
+            occupancy = {}
+            temperature = None
+            try:
+                temperature_sensor.measure()
+                temperature = temperature_sensor.temperature()
+            except OSError as error:
+                print("Cafeteria temperature sensor read failed:", error)
 
         fire_detected = any(
             value > SMOKE_THRESHOLD for value in readings.values()
         ) or (temperature is not None and temperature > TEMPERATURE_THRESHOLD)
-        buzzer.value(1 if fire_detected else 0)
+        if buzzer is not None:
+            buzzer.value(1 if fire_detected else 0)
 
         print("Smoke readings:", readings)
         print("Cafeteria temperature:", temperature)
@@ -169,7 +193,7 @@ def run_fire_safety_system(key=DEVICE_UID):
             print(SuddenTemperatureIncrease(temperature, DEVICE_UID))
         if boot.connect_wifi():
             try:
-                post_sensor_readings(readings, temperature)
+                post_sensor_readings(readings, temperature, occupancy)
             except OSError as error:
                 print("Sensor report failed; retrying next cycle:", error)
         time.sleep(3)

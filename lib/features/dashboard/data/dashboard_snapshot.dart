@@ -9,6 +9,7 @@ class DashboardSnapshot {
     required this.incidents,
     required this.alerts,
     required this.routes,
+    this.systemEvents = const [],
     required this.userProfile,
   });
 
@@ -21,6 +22,7 @@ class DashboardSnapshot {
   final List<Map<String, dynamic>> incidents;
   final List<Map<String, dynamic>> alerts;
   final List<Map<String, dynamic>> routes;
+  final List<Map<String, dynamic>> systemEvents;
   final Map<String, dynamic>? userProfile;
 
   factory DashboardSnapshot.fromJson(Map<String, dynamic> json) {
@@ -57,8 +59,22 @@ class DashboardSnapshot {
       incidents: rows('incidents'),
       alerts: rows('alerts'),
       routes: rows('routes'),
+      systemEvents: json['system_events'] is List
+          ? rows('system_events')
+          : const [],
       userProfile: profile == null ? null : Map<String, dynamic>.from(profile),
     );
+  }
+
+  bool get hasSimulatedSensorReports {
+    final seenDevices = <String>{};
+    for (final event in systemEvents) {
+      final device = event['source']?.toString();
+      if (device == null || !seenDevices.add(device)) continue;
+      final payload = event['payload'];
+      if (payload is Map && payload['simulation'] == true) return true;
+    }
+    return false;
   }
 
   int get peopleInside {

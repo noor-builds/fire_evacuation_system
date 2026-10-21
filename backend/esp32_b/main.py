@@ -3,10 +3,12 @@ import random
 import time
 
 import urequests
-from machine import ADC, Pin
 
 import boot
-from device_config import API_URL, DEVICE_API_TOKEN
+from device_config import API_URL, DEVICE_API_TOKEN, SIMULATE_SENSORS
+
+if not SIMULATE_SENSORS:
+    from machine import ADC, Pin
 
 DEVICE_UID = "ESP 32 B"
 NAME = DEVICE_UID
@@ -18,13 +20,17 @@ SMOKE_SENSOR_PINS = {
     "BLOCK F": 33,
 }
 
-buzzer = Pin(BUZZER_PIN, Pin.OUT)
-buzzer.value(0)
-sensors = {}
-for zone_name, pin_number in SMOKE_SENSOR_PINS.items():
-    sensor = ADC(Pin(pin_number))
-    sensor.atten(ADC.ATTN_11DB)
-    sensors[zone_name] = sensor
+if SIMULATE_SENSORS:
+    buzzer = None
+    sensors = {}
+else:
+    buzzer = Pin(BUZZER_PIN, Pin.OUT)
+    buzzer.value(0)
+    sensors = {}
+    for zone_name, pin_number in SMOKE_SENSOR_PINS.items():
+        sensor = ADC(Pin(pin_number))
+        sensor.atten(ADC.ATTN_11DB)
+        sensors[zone_name] = sensor
 
 
 def potentialFireMsg(room, smokeVal, key):
@@ -55,8 +61,13 @@ def get_amount_of_heads_in_class(key):
     return random.randint(1, 43)
 
 
-def post_sensor_readings(readings):
-    payload = {"key": DEVICE_UID, "readings": readings}
+def post_sensor_readings(readings, occupancy):
+    payload = {
+        "key": DEVICE_UID,
+        "readings": readings,
+        "occupancy": occupancy,
+        "simulation": SIMULATE_SENSORS,
+    }
     headers = {"Content-Type": "application/json"}
     if DEVICE_API_TOKEN:
         headers["X-Device-Token"] = DEVICE_API_TOKEN
@@ -84,11 +95,22 @@ def run_fire_safety_system(key=DEVICE_UID):
         raise ValueError("This device only runs as {}".format(DEVICE_UID))
     boot.connect_wifi()
     while True:
-        readings = {name: sensor.read() for name, sensor in sensors.items()}
+        if SIMULATE_SENSORS:
+            readings = {
+                name: random.randint(120, 900) for name in SMOKE_SENSOR_PINS
+            }
+            occupancy = {
+                name: random.randint(0, 30) for name in SMOKE_SENSOR_PINS
+            }
+            print("DEMO DATA ONLY - randomized smoke and occupancy readings")
+        else:
+            readings = {name: sensor.read() for name, sensor in sensors.items()}
+            occupancy = {}
         fire_detected = any(
             value > SMOKE_THRESHOLD for value in readings.values()
         )
-        buzzer.value(1 if fire_detected else 0)
+        if buzzer is not None:
+            buzzer.value(1 if fire_detected else 0)
 
         print("Smoke readings:", readings)
         if fire_detected:
@@ -101,7 +123,7 @@ def run_fire_safety_system(key=DEVICE_UID):
             print("\n".join(alert))
         if boot.connect_wifi():
             try:
-                post_sensor_readings(readings)
+                post_sensor_readings(readings, occupancy)
             except OSError as error:
                 print("Sensor report failed; retrying next cycle:", error)
         time.sleep(3)

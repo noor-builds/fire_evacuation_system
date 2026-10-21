@@ -47,6 +47,7 @@ class SensorReadings(BaseModel):
     readings: dict[str, float] = Field(default_factory=dict)
     temp: float | None = Field(default=None, ge=-40, le=125)
     occupancy: dict[str, int] = Field(default_factory=dict)
+    simulation: bool = False
 
     @model_validator(mode="after")
     def validate_report(self) -> "SensorReadings":
@@ -113,6 +114,7 @@ def _persist_report(payload: SensorReadings) -> dict:
             readings=payload.readings,
             temperature=payload.temp,
             occupancy=payload.occupancy,
+            simulation=payload.simulation,
         )
     except LookupError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
