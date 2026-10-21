@@ -1,8 +1,7 @@
-STA_IF: int
-AP_IF: int
-
-
 class WLAN:
+    IF_STA: int
+    IF_AP: int
+
     def __init__(self, interface_id: int) -> None: ...
 
     def active(self, state: bool | None = ...) -> bool | None: ...

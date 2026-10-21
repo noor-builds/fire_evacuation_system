@@ -110,7 +110,7 @@ def _get_or_create_sensor(
     unit: str,
 ) -> str:
     client = get_client()
-    existing = (
+    existing_response = (
         client.table("sensors")
         .select("id")
         .eq("device_id", device_id)
@@ -119,8 +119,10 @@ def _get_or_create_sensor(
         .eq("sensor_name", sensor_name)
         .maybe_single()
         .execute()
-        .data
     )
+    # PostgREST may return None (rather than a response with data=None) when
+    # maybe_single() finds no row. A sensor's first report takes this path.
+    existing = existing_response.data if existing_response is not None else None
     if existing:
         return existing["id"]
 
@@ -164,13 +166,15 @@ def _update_zone_risk(
     temperature_score: float | None = None,
 ) -> None:
     client = get_client()
-    previous = (
+    previous_response = (
         client.table("zone_risk")
         .select("smoke_score,temperature_score")
         .eq("zone_id", zone_id)
         .maybe_single()
         .execute()
-        .data
+    )
+    previous = (
+        previous_response.data if previous_response is not None else None
     ) or {}
     smoke = (
         smoke_score
@@ -205,7 +209,7 @@ def _record_or_resolve_incident(
     description: str,
 ) -> str | None:
     client = get_client()
-    existing = (
+    existing_response = (
         client.table("incidents")
         .select("id")
         .eq("zone_id", zone_id)
@@ -213,8 +217,8 @@ def _record_or_resolve_incident(
         .eq("status", "active")
         .maybe_single()
         .execute()
-        .data
     )
+    existing = existing_response.data if existing_response is not None else None
 
     if not active:
         if existing:

@@ -2,10 +2,75 @@ import json
 import random
 import time
 
-import urequests
+import network
 
-import boot
-from device_config import API_URL, DEVICE_API_TOKEN, SIMULATE_SENSORS
+from device_config import (
+    API_URL,
+    DEVICE_API_TOKEN,
+    SIMULATE_SENSORS,
+    WIFI_PASSWORD,
+    WIFI_SSID,
+)
+
+try:
+    import urequests
+except ImportError:
+    import requests as urequests
+
+_station_interface = getattr(
+    network.WLAN,
+    "IF_STA",
+    getattr(network, "STA_IF", None),
+)
+if _station_interface is None:
+    raise RuntimeError("This MicroPython build has no Wi-Fi station interface.")
+wlan = network.WLAN(_station_interface)
+
+
+def connect_wifi():
+    wlan.active(True)
+    if wlan.isconnected():
+        print("Wi-Fi connected:", wlan.ifconfig())
+        return True
+
+    # Reset the station interface before a new attempt. Calling connect() again
+    # while a previous attempt is pending can raise "Wifi Internal Error".
+    wlan.active(False)
+    time.sleep(1)
+    wlan.active(True)
+    try:
+        wlan.config(reconnects=3)
+    except (AttributeError, TypeError):
+        pass
+
+    print("Connecting to Wi-Fi:", WIFI_SSID)
+    try:
+        wlan.connect(WIFI_SSID, WIFI_PASSWORD)
+    except OSError as error:
+        print("Wi-Fi connect call failed:", error)
+        wlan.active(False)
+        return False
+    for _ in range(30):
+        if wlan.isconnected():
+            print("Wi-Fi connected:", wlan.ifconfig())
+            return True
+        time.sleep(1)
+
+    status = wlan.status()
+    status_names = {
+        getattr(network, "STAT_IDLE", None): "idle",
+        getattr(network, "STAT_CONNECTING", None): "connecting",
+        getattr(network, "STAT_WRONG_PASSWORD", None): "wrong password",
+        getattr(network, "STAT_NO_AP_FOUND", None): "access point not found",
+        getattr(network, "STAT_CONNECT_FAIL", None): "connection failed",
+    }
+    detail = status_names.get(status, str(status))
+    wlan.active(False)
+    print(
+        "Wi-Fi connection failed ({}); will reset and retry next cycle."
+        .format(detail)
+    )
+    return False
 
 if not SIMULATE_SENSORS:
     import dht
@@ -149,7 +214,7 @@ def post_sensor_readings(readings, temperature, occupancy):
 def run_fire_safety_system(key=DEVICE_UID):
     if key != DEVICE_UID:
         raise ValueError("This device only runs as {}".format(DEVICE_UID))
-    boot.connect_wifi()
+    connect_wifi()
     while True:
         if SIMULATE_SENSORS:
             readings = {
@@ -191,7 +256,7 @@ def run_fire_safety_system(key=DEVICE_UID):
             print("\n".join(alert))
         if temperature is not None and temperature > TEMPERATURE_THRESHOLD:
             print(SuddenTemperatureIncrease(temperature, DEVICE_UID))
-        if boot.connect_wifi():
+        if connect_wifi():
             try:
                 post_sensor_readings(readings, temperature, occupancy)
             except OSError as error:
