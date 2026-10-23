@@ -230,7 +230,8 @@ def run_fire_safety_system(key=DEVICE_UID):
     while True:
         if SIMULATE_SENSORS:
             readings = {
-                name: random.randint(120, 900) for name in SMOKE_SENSOR_PINS
+                name: random.randint(SMOKE_THRESHOLD + 1, 4095)
+                for name in SMOKE_SENSOR_PINS
             }
             occupancy = {
                 name: random.randint(0, 30) for name in SMOKE_SENSOR_PINS
@@ -242,20 +243,22 @@ def run_fire_safety_system(key=DEVICE_UID):
             readings = read_smoke_sensors()
             occupancy = {}
 
-        fire_detected = any(
-            value > SMOKE_THRESHOLD for value in readings.values()
-        )
+        fire_zones = [
+            name
+            for name, value in readings.items()
+            if value < SMOKE_THRESHOLD
+        ]
+        fire_detected = bool(fire_zones)
         if fire_detected:
             beep_alarm()
         elif buzzer is not None:
             buzzer.value(0)
 
         print("Smoke readings:", readings)
-        if any(value > SMOKE_THRESHOLD for value in readings.values()):
-            highest_room = max(readings, key=readings.get)
+        for fire_room in fire_zones:
             alert = potentialFireMsga(
-                highest_room,
-                readings[highest_room],
+                fire_room,
+                readings[fire_room],
                 DEVICE_UID,
             )
             print("\n".join(alert))

@@ -213,9 +213,7 @@ def run_fire_safety_system(key=DEVICE_UID):
             except OSError as error:
                 print("Cafeteria temperature sensor read failed:", error)
         fire_zones = detect_fire_zones(readings)
-        fire_detected = bool(fire_zones) or (
-            temperature is not None and temperature > TEMPERATURE_THRESHOLD
-        )
+        fire_detected = bool(fire_zones)
         if buzzer is not None:
             buzzer.value(1 if fire_detected else 0)
 
