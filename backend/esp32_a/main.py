@@ -73,27 +73,23 @@ def connect_wifi():
     return False
 
 if not SIMULATE_SENSORS:
-    import dht
     from machine import ADC, Pin
 
 DEVICE_UID = "ESP 32 A"
 NAME = DEVICE_UID
 SMOKE_THRESHOLD = 1300
-TEMPERATURE_THRESHOLD = 55
 BUZZER_PIN = 25
-TEMPERATURE_SENSOR_PIN = 23
 # GPIO numbers are the labels printed on the ESP32 board.
 SMOKE_SENSOR_PINS = {
     "BLOCK A": 32,
     "BLOCK B": 33,
-    "BLOCK C": 34,
-    "BLOCK D": 35,
+    "BLOCK C": 26,
+    "BLOCK D": 27,
 }
 
 if SIMULATE_SENSORS:
     buzzer = None
     sensors = {}
-    temperature_sensor = None
 else:
     buzzer = Pin(BUZZER_PIN, Pin.OUT)
     buzzer.value(0)
@@ -102,7 +98,6 @@ else:
         sensor = ADC(Pin(pin_number))
         sensor.atten(ADC.ATTN_11DB)
         sensors[zone_name] = sensor
-    temperature_sensor = dht.DHT11(Pin(TEMPERATURE_SENSOR_PIN))
 
 
 def evacuation_gradient_lights(danger_zone, key, light_strip=None):
@@ -143,12 +138,6 @@ def get_smoke_desnitya(room, smokeVal, key):
     return room, smokeVal
 
 
-def get_cafe_temp(temp, key):
-    if key != DEVICE_UID:
-        return None
-    return "cafeteria temprature", temp
-
-
 def potentialFireMsga(room, smokeVal, key):
     if key != DEVICE_UID:
         return None
@@ -173,15 +162,6 @@ def beep_alarm():
         buzzer.value(0)
 
 
-def SuddenTemperatureIncrease(temp, key):
-    if key != DEVICE_UID:
-        return None
-    return (
-        "Sudden increase in temperature in cafe! Current: {}°C. "
-        "Start evacuation!".format(temp)
-    )
-
-
 def get_amount_of_people(key):
     if key != DEVICE_UID:
         return None
@@ -194,15 +174,13 @@ def get_amount_of_students(key):
     return random.randint(1, 43)
 
 
-def post_sensor_readings(readings, temperature, occupancy):
+def post_sensor_readings(readings, occupancy):
     payload = {
         "key": DEVICE_UID,
         "readings": readings,
         "occupancy": occupancy,
         "simulation": SIMULATE_SENSORS,
     }
-    if temperature is not None:
-        payload["temp"] = temperature
     headers = {"Content-Type": "application/json"}
     if DEVICE_API_TOKEN:
         headers["X-Device-Token"] = DEVICE_API_TOKEN
@@ -257,31 +235,22 @@ def run_fire_safety_system(key=DEVICE_UID):
             occupancy = {
                 name: random.randint(0, 30) for name in SMOKE_SENSOR_PINS
             }
-            temperature = random.randint(22, 34)
             print(
-                "DEMO DATA ONLY - randomized smoke, occupancy, and "
-                "temperature readings"
+                "DEMO DATA ONLY - randomized smoke and occupancy readings"
             )
         else:
             readings = read_smoke_sensors()
             occupancy = {}
-            temperature = None
-            try:
-                temperature_sensor.measure()
-                temperature = temperature_sensor.temperature()
-            except OSError as error:
-                print("Cafeteria temperature sensor read failed:", error)
 
         fire_detected = any(
             value > SMOKE_THRESHOLD for value in readings.values()
-        ) or (temperature is not None and temperature > TEMPERATURE_THRESHOLD)
+        )
         if fire_detected:
             beep_alarm()
         elif buzzer is not None:
             buzzer.value(0)
 
         print("Smoke readings:", readings)
-        print("Cafeteria temperature:", temperature)
         if any(value > SMOKE_THRESHOLD for value in readings.values()):
             highest_room = max(readings, key=readings.get)
             alert = potentialFireMsga(
@@ -290,13 +259,11 @@ def run_fire_safety_system(key=DEVICE_UID):
                 DEVICE_UID,
             )
             print("\n".join(alert))
-        if temperature is not None and temperature > TEMPERATURE_THRESHOLD:
-            print(SuddenTemperatureIncrease(temperature, DEVICE_UID))
-        if not readings and temperature is None and not occupancy:
+        if not readings and not occupancy:
             print("Sensor report skipped: no valid sensor readings this cycle.")
         elif connect_wifi():
             try:
-                post_sensor_readings(readings, temperature, occupancy)
+                post_sensor_readings(readings, occupancy)
             except OSError as error:
                 print("Sensor report failed; retrying next cycle:", error)
         time.sleep(3)

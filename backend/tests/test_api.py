@@ -435,10 +435,8 @@ class SensorApiTests(unittest.TestCase):
         self.assertEqual(server.db.SMOKE_THRESHOLD, 1300)
         self.assertEqual(server.db.TEMPERATURE_THRESHOLD, 55)
         self.assertEqual(_firmware_constant("esp32_a", "SMOKE_THRESHOLD"), 1300)
-        self.assertEqual(
-            _firmware_constant("esp32_a", "TEMPERATURE_THRESHOLD"), 55
-        )
-        self.assertEqual(_firmware_constant("esp32_b", "SMOKE_THRESHOLD"), 1300)
+        self.assertEqual(_firmware_constant("esp32_b", "TEMPERATURE_THRESHOLD"), 55)
+        self.assertEqual(_firmware_constant("esp32_b", "SMOKE_THRESHOLD"), 100)
 
     def test_firmware_block_maps_match_api_device_assignments(self) -> None:
         firmware_devices = {

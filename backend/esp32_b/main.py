@@ -73,12 +73,15 @@ def connect_wifi():
     return False
 
 if not SIMULATE_SENSORS:
+    import dht
     from machine import ADC, Pin
 
 DEVICE_UID = "ESP 32 B"
 NAME = DEVICE_UID
 SMOKE_THRESHOLD = 100
+TEMPERATURE_THRESHOLD = 55
 BUZZER_PIN = 25
+TEMPERATURE_SENSOR_PIN = 23
 # GPIO numbers are the labels printed on the ESP32 board.
 SMOKE_SENSOR_PINS = {
     "BLOCK E": 32,
@@ -88,6 +91,7 @@ SMOKE_SENSOR_PINS = {
 if SIMULATE_SENSORS:
     buzzer = None
     sensors = {}
+    temperature_sensor = None
 else:
     buzzer = Pin(BUZZER_PIN, Pin.OUT)
     buzzer.value(0)
@@ -96,6 +100,7 @@ else:
         sensor = ADC(Pin(pin_number))
         sensor.atten(ADC.ATTN_11DB)
         sensors[zone_name] = sensor
+    temperature_sensor = dht.DHT11(Pin(TEMPERATURE_SENSOR_PIN))
 
 
 def potentialFireMsg(room, smokeVal, key):
@@ -114,6 +119,12 @@ def get_smoke_desnity(room, smokeVal, key):
     return room, smokeVal
 
 
+def get_cafe_temp(temp, key):
+    if key != DEVICE_UID:
+        return None
+    return "cafeteria temprature", temp
+
+
 def detect_fire_zones(readings):
     """ESP 32 B smoke sensors signal danger with readings below the limit."""
     return [
@@ -121,6 +132,15 @@ def detect_fire_zones(readings):
         for room, smoke_value in readings.items()
         if smoke_value < SMOKE_THRESHOLD
     ]
+
+
+def SuddenTemperatureIncrease(temp, key):
+    if key != DEVICE_UID:
+        return None
+    return (
+        "Sudden increase in temperature in cafe! Current: {}°C. "
+        "Start evacuation!".format(temp)
+    )
 
 
 def get_amount_of_peopleb(key):
@@ -135,13 +155,15 @@ def get_amount_of_heads_in_class(key):
     return random.randint(1, 43)
 
 
-def post_sensor_readings(readings, occupancy):
+def post_sensor_readings(readings, temperature, occupancy):
     payload = {
         "key": DEVICE_UID,
         "readings": readings,
         "occupancy": occupancy,
         "simulation": SIMULATE_SENSORS,
     }
+    if temperature is not None:
+        payload["temp"] = temperature
     headers = {"Content-Type": "application/json"}
     if DEVICE_API_TOKEN:
         headers["X-Device-Token"] = DEVICE_API_TOKEN
@@ -176,16 +198,29 @@ def run_fire_safety_system(key=DEVICE_UID):
             occupancy = {
                 name: random.randint(0, 30) for name in SMOKE_SENSOR_PINS
             }
-            print("DEMO DATA ONLY - randomized smoke and occupancy readings")
+            temperature = random.randint(22, 34)
+            print(
+                "DEMO DATA ONLY - randomized smoke, occupancy, and "
+                "temperature readings"
+            )
         else:
             readings = {name: sensor.read() for name, sensor in sensors.items()}
             occupancy = {}
+            temperature = None
+            try:
+                temperature_sensor.measure()
+                temperature = temperature_sensor.temperature()
+            except OSError as error:
+                print("Cafeteria temperature sensor read failed:", error)
         fire_zones = detect_fire_zones(readings)
-        fire_detected = bool(fire_zones)
+        fire_detected = bool(fire_zones) or (
+            temperature is not None and temperature > TEMPERATURE_THRESHOLD
+        )
         if buzzer is not None:
             buzzer.value(1 if fire_detected else 0)
 
         print("Smoke readings:", readings)
+        print("Cafeteria temperature:", temperature)
         for fire_room in fire_zones:
             alert = potentialFireMsg(
                 fire_room,
@@ -193,9 +228,11 @@ def run_fire_safety_system(key=DEVICE_UID):
                 DEVICE_UID,
             )
             print("\n".join(alert))
+        if temperature is not None and temperature > TEMPERATURE_THRESHOLD:
+            print(SuddenTemperatureIncrease(temperature, DEVICE_UID))
         if connect_wifi():
             try:
-                post_sensor_readings(readings, occupancy)
+                post_sensor_readings(readings, temperature, occupancy)
             except OSError as error:
                 print("Sensor report failed; retrying next cycle:", error)
         time.sleep(0.2)
