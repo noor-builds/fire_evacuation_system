@@ -13,6 +13,10 @@ load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env")
 load_dotenv()
 
 SMOKE_THRESHOLD = 1300
+DEVICE_SMOKE_THRESHOLDS = {
+    "ESP 32 A": SMOKE_THRESHOLD,
+    "ESP 32 B": 100,
+}
 TEMPERATURE_THRESHOLD = 55
 DEVICE_ZONES = {
     "ESP 32 A": ("BLOCK A", "BLOCK B", "BLOCK C", "BLOCK D"),
@@ -321,10 +325,23 @@ def persist_sensor_report(
         ).execute()
         recorded += 1
 
-        score = _score(value, SMOKE_THRESHOLD)
+        threshold = DEVICE_SMOKE_THRESHOLDS[device_uid]
+        # ESP 32 B's sensor reports lower ADC values as smoke increases;
+        # ESP 32 A uses the opposite polarity.
+        low_value_is_danger = device_uid == "ESP 32 B"
+        score = (
+            100.0 - _score(value, threshold)
+            if low_value_is_danger
+            else _score(value, threshold)
+        )
         _update_zone_risk(zone_id, smoke_score=score)
-        active = value > SMOKE_THRESHOLD
-        severity = "critical" if value >= SMOKE_THRESHOLD * 2 else "high"
+        active = value < threshold if low_value_is_danger else value > threshold
+        critical = (
+            score >= 85
+            if low_value_is_danger
+            else value >= threshold * 2
+        )
+        severity = "critical" if active and critical else "high"
         description = f"Smoke sensor reading in {zone_name}: {value:g} ADC count."
         if _record_or_resolve_incident(
             zone_id=zone_id,

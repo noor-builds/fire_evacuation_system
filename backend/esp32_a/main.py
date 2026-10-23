@@ -159,6 +159,20 @@ def potentialFireMsga(room, smokeVal, key):
     )
 
 
+def beep_alarm():
+    """Pulse the active buzzer so an alarm sounds as separate beeps."""
+    if buzzer is None:
+        return
+    try:
+        for _ in range(3):
+            buzzer.value(1)
+            time.sleep(0.15)
+            buzzer.value(0)
+            time.sleep(0.15)
+    finally:
+        buzzer.value(0)
+
+
 def SuddenTemperatureIncrease(temp, key):
     if key != DEVICE_UID:
         return None
@@ -211,6 +225,26 @@ def post_sensor_readings(readings, temperature, occupancy):
         response.close()
 
 
+def read_smoke_sensors():
+    """Read smoke sensors independently so one timeout does not stop the loop."""
+    readings = {}
+    for zone_name, sensor in sensors.items():
+        try:
+            readings[zone_name] = sensor.read()
+        except OSError as first_error:
+            print("Smoke sensor read failed for {}: {}".format(zone_name, first_error))
+            time.sleep(0.1)
+            try:
+                readings[zone_name] = sensor.read()
+            except OSError as retry_error:
+                print(
+                    "Smoke sensor retry failed for {}: {}".format(
+                        zone_name, retry_error
+                    )
+                )
+    return readings
+
+
 def run_fire_safety_system(key=DEVICE_UID):
     if key != DEVICE_UID:
         raise ValueError("This device only runs as {}".format(DEVICE_UID))
@@ -229,7 +263,7 @@ def run_fire_safety_system(key=DEVICE_UID):
                 "temperature readings"
             )
         else:
-            readings = {name: sensor.read() for name, sensor in sensors.items()}
+            readings = read_smoke_sensors()
             occupancy = {}
             temperature = None
             try:
@@ -241,8 +275,10 @@ def run_fire_safety_system(key=DEVICE_UID):
         fire_detected = any(
             value > SMOKE_THRESHOLD for value in readings.values()
         ) or (temperature is not None and temperature > TEMPERATURE_THRESHOLD)
-        if buzzer is not None:
-            buzzer.value(1 if fire_detected else 0)
+        if fire_detected:
+            beep_alarm()
+        elif buzzer is not None:
+            buzzer.value(0)
 
         print("Smoke readings:", readings)
         print("Cafeteria temperature:", temperature)
@@ -256,7 +292,9 @@ def run_fire_safety_system(key=DEVICE_UID):
             print("\n".join(alert))
         if temperature is not None and temperature > TEMPERATURE_THRESHOLD:
             print(SuddenTemperatureIncrease(temperature, DEVICE_UID))
-        if connect_wifi():
+        if not readings and temperature is None and not occupancy:
+            print("Sensor report skipped: no valid sensor readings this cycle.")
+        elif connect_wifi():
             try:
                 post_sensor_readings(readings, temperature, occupancy)
             except OSError as error:

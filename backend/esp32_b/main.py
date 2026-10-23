@@ -114,6 +114,15 @@ def get_smoke_desnity(room, smokeVal, key):
     return room, smokeVal
 
 
+def detect_fire_zones(readings):
+    """ESP 32 B smoke sensors signal danger with readings below the limit."""
+    return [
+        room
+        for room, smoke_value in readings.items()
+        if smoke_value < SMOKE_THRESHOLD
+    ]
+
+
 def get_amount_of_peopleb(key):
     if key != DEVICE_UID:
         return None
@@ -171,18 +180,16 @@ def run_fire_safety_system(key=DEVICE_UID):
         else:
             readings = {name: sensor.read() for name, sensor in sensors.items()}
             occupancy = {}
-        fire_detected = any(
-            value < SMOKE_THRESHOLD for value in readings.values()
-        )
+        fire_zones = detect_fire_zones(readings)
+        fire_detected = bool(fire_zones)
         if buzzer is not None:
             buzzer.value(1 if fire_detected else 0)
 
         print("Smoke readings:", readings)
-        if fire_detected:
-            highest_room = min(readings, key=readings.get)
+        for fire_room in fire_zones:
             alert = potentialFireMsg(
-                highest_room,
-                readings[highest_room],
+                fire_room,
+                readings[fire_room],
                 DEVICE_UID,
             )
             print("\n".join(alert))
@@ -191,7 +198,7 @@ def run_fire_safety_system(key=DEVICE_UID):
                 post_sensor_readings(readings, occupancy)
             except OSError as error:
                 print("Sensor report failed; retrying next cycle:", error)
-        time.sleep(3)
+        time.sleep(0.2)
 
 
 run_fire_safety_system()
